@@ -1,12 +1,14 @@
 # eternal-return-api
 
+[![CI](https://github.com/adgjmptw2/eternal-return-api/actions/workflows/ci.yml/badge.svg)](https://github.com/adgjmptw2/eternal-return-api/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/eternal-return-api)](https://www.npmjs.com/package/eternal-return-api)
+
 Unofficial TypeScript client for the [Eternal Return Open API](https://developer.eternalreturn.io).
 
 The code comes from [ERCraft](https://ercraft.net), an Eternal Return stats site that runs on this API. The parts that took debugging to get right are built in: rate limiting, 429 retries, error codes inside HTTP 200 responses, and field name changes between API versions.
 
 [한국어](README.ko.md)
 
-- No runtime dependencies. Uses built-in `fetch`; Node 18+ (tested on Node 22).
+- No runtime dependencies. Uses built-in `fetch`; Node 18+ (CI tests Node 18, 20, 22 and 24).
 - ESM only: `import`, not `require`.
 - Full TypeScript types for common responses. Unknown fields are preserved.
 

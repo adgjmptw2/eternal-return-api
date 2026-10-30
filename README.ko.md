@@ -1,10 +1,12 @@
 # eternal-return-api
 
+[![CI](https://github.com/adgjmptw2/eternal-return-api/actions/workflows/ci.yml/badge.svg)](https://github.com/adgjmptw2/eternal-return-api/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/eternal-return-api)](https://www.npmjs.com/package/eternal-return-api)
+
 [이터널 리턴 Open API](https://developer.eternalreturn.io)용 비공식 TypeScript 클라이언트입니다.
 
 전적 사이트 [ERCraft](https://ercraft.net)에서 쓰는 코드를 떼어 냈습니다. 요청 속도 제한, 429 재시도, HTTP 200 안에 든 오류 코드, API 버전마다 다른 필드 이름처럼 운영하면서 맞춰 온 부분이 들어 있습니다.
 
-- 런타임 의존성 없음. 내장 `fetch`를 쓰고, Node 18 이상(Node 22에서 테스트).
+- 런타임 의존성 없음. 내장 `fetch` 사용, Node 18 이상(CI에서 Node 18, 20, 22, 24 테스트).
 - ESM 전용: `require`가 아니라 `import`로 씁니다.
 - 자주 쓰는 응답은 타입이 있고, 모르는 필드도 그대로 남습니다.
 
