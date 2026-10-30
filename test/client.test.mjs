@@ -10,6 +10,7 @@ import {
   toPlayerSeason,
   gameModeName,
   RateLimiter,
+  summarizeGames,
 } from '../dist/index.js'
 
 function json(body, status = 200) {
@@ -250,4 +251,48 @@ test('timeout also covers reading the body', async () => {
     }),
   })
   await assert.rejects(client.request('/v1/x'), (e) => e instanceof ErApiError && e.status === 504)
+})
+
+test('getNames resolves every kind of code, loading tables once', async () => {
+  const file = [
+    'Character/Name/1┃재키', 'Item/Name/101101┃가위', 'Trait/Name/7000201┃<color=yellow>벽력</color>',
+    'WeaponType/Glove┃글러브', 'Skill/Group/Name/4000000┃블링크', 'Skill/Group/Name/4511000┃블레싱: 명상',
+  ].join('\n')
+  const { client, calls } = fakeClient({
+    '/v1/l10n/Korean': json({ code: 200, message: 'ok', data: { l10Path: 'https://cdn.example/ko.txt' } }),
+    'https://cdn.example/ko.txt': () => new Response(file),
+    '/v2/data/TacticalSkillSetGroup': json({ code: 200, message: 'ok', data: [
+      { group: 30, startCode: 31, icon: 'VSkillIcon_4000000' },
+      { group: 500010, startCode: 500011, icon: 'VSkillIcon_4511000' },
+    ] }),
+    '/v2/data/TacticalSkillSet': json({ code: 200, message: 'ok', data: [
+      { code: 31, skillCode: 4000001 },
+      { code: 500011, skillCode: '4501001, 4501011' },
+    ] }),
+  })
+  const [names] = await Promise.all([client.getNames('Korean'), client.getNames('Korean')])
+  assert.equal(names.character(1), '재키')
+  assert.equal(names.item(101101), '가위')
+  assert.equal(names.trait(7000201), '벽력')
+  assert.equal(names.weapon(1), '글러브')
+  assert.equal(names.weapon(12), null)
+  assert.equal(names.tacticalSkill(30), '블링크')
+  assert.equal(names.tacticalSkill(500010), '블레싱: 명상')
+  assert.equal(names.item(999), null)
+  assert.equal(calls.length, 4)
+})
+
+test('summarizeGames counts per character, most played first', () => {
+  const g = (characterNum, gameRank, victory, playerKill, damageToPlayer) =>
+    ({ characterNum, gameRank, victory, playerKill, playerAssistant: 1, damageToPlayer })
+  const s = summarizeGames([g(2, 1, 1, 5, 10000), g(1, 4, 0, 1, undefined), g(2, 3, 0, 2, 20000), g(2, 0, 0, 0, undefined)])
+  assert.equal(s.overall.games, 4)
+  assert.equal(s.overall.wins, 1)
+  assert.equal(s.overall.top3, 2)
+  assert.equal(s.overall.averageRank, (1 + 4 + 3) / 3)
+  assert.equal(s.overall.averageKills, 2)
+  assert.equal(s.overall.averageDamage, 15000)
+  assert.deepEqual(s.characters.map((c) => [c.characterNum, c.games]), [[2, 3], [1, 1]])
+  assert.equal(s.characters[1].averageDamage, null)
+  assert.equal(summarizeGames([]).overall.winRate, 0)
 })

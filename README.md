@@ -21,7 +21,7 @@ npm install eternal-return-api
 ## Use
 
 ```ts
-import { ErClient, MatchingMode } from 'eternal-return-api'
+import { ErClient, MatchingMode, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -34,17 +34,26 @@ const seasonId = seasons.currentRankedSeasonId!
 const rank = await er.getUserRank(user.uid, seasonId)
 const stats = await er.getUserStats(user.uid, seasonId, MatchingMode.RANKED)
 
+// Names from the official localization file
+const names = await er.getNames('English')
+
 // Recent games, newest first, across pages
+const games = []
 for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-10-01') })) {
-  console.log(game.gameId, game.characterNum, game.gameRank)
+  games.push(game)
+  console.log(names.character(game.characterNum), names.weapon(game.bestWeapon), game.gameRank)
 }
+
+// Win rate, average rank and kills, overall and per character
+const { overall, characters } = summarizeGames(games)
 
 // Everyone in one game
 const players = await er.getGame(12345678)
-
-// Character names from the official localization file
-const names = await er.getCharacterNames('Korean')
 ```
+
+`getNames` turns the codes in game records into names: `character`, `item`, `trait`, `weapon` (`bestWeapon`) and `tacticalSkill` (`tacticalSkillGroup`). Each returns `null` for unknown codes.
+
+`summarizeGames` combines all modes passed in. Filter by `matchingMode` first if you need one mode.
 
 Get an API key at [developer.eternalreturn.io](https://developer.eternalreturn.io). Keep it on your server. Never expose it to the browser.
 
@@ -62,6 +71,7 @@ Get an API key at [developer.eternalreturn.io](https://developer.eternalreturn.i
 | `getData(metaType)` | `/v2/data/{metaType}` | throws |
 | `getSeasons()` | `/v2/data/Season`, cached | throws |
 | `getL10n(language)`, `getCharacterNames(language)` | `/v1/l10n/{language}` + file download | throws |
+| `getNames(language)` | l10n + `TacticalSkillSetGroup`, `TacticalSkillSet`, cached | throws |
 | `request(path)` | any path | throws |
 
 API errors and timeouts throw `ErApiError` with `status` (HTTP status, or the body `code` when HTTP was 200) and `apiCode` (the body `code`). Network errors from `fetch` are passed through as-is.
@@ -80,6 +90,34 @@ new ErClient({
 ```
 
 All requests from one `ErClient` share one rate limiter. Use one client per key.
+
+## Discord bot example
+
+[examples/discord-bot](examples/discord-bot) is a bot with one command, `/er nickname`. It shows current ranked RP, a recent games summary, most played characters and the last five games.
+
+## MCP server
+
+The package includes an [MCP](https://modelcontextprotocol.io) server, so AI assistants such as Claude can look up players and games.
+
+```json
+{
+  "mcpServers": {
+    "eternal-return": {
+      "command": "npx",
+      "args": ["-y", "-p", "eternal-return-api", "eternal-return-mcp"],
+      "env": { "ER_API_KEY": "your key" }
+    }
+  }
+}
+```
+
+| Tool | Input | Returns |
+|---|---|---|
+| `player_profile` | `nickname`, `games` (1-50, default 20) | ranked RP, recent games summary (Cobalt Protocol excluded), most played characters, recent games with names |
+| `game_detail` | `gameId` | everyone in the game |
+| `top_ranks` | `limit` (1-100, default 20) | top players of the current ranked season |
+
+Names are in Korean by default. Set `ER_LANGUAGE` (for example `English`) to change it.
 
 ## Notes from running ERCraft
 

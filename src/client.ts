@@ -1,7 +1,14 @@
 import { ErApiError, ErNicknameMismatchError } from './errors.js'
-import { characterNames, parseL10n } from './l10n.js'
+import { parseL10n } from './l10n.js'
 import { RateLimiter, defaultSleep, type Sleep } from './limiter.js'
 import { MatchingMode, TeamMode } from './modes.js'
+import {
+  buildGameNames,
+  characterNames,
+  type GameNames,
+  type TacticalSkillGroupRow,
+  type TacticalSkillSetRow,
+} from './names.js'
 import { SeasonCatalog, type SeasonRow } from './seasons.js'
 import type {
   Envelope,
@@ -75,6 +82,7 @@ export class ErClient {
   private seasonCache: { value: SeasonRow[]; expiresAt: number } | null = null
   private seasonLoading: Promise<SeasonRow[]> | null = null
   private readonly l10nLoading = new Map<string, Promise<Map<string, string>>>()
+  private readonly namesLoading = new Map<string, Promise<GameNames>>()
 
   constructor(options: ErClientOptions) {
     if (!options.apiKey) throw new TypeError('apiKey is required')
@@ -303,6 +311,29 @@ export class ErClient {
   /** Character code → name in the given language. */
   async getCharacterNames(language: string): Promise<Map<number, string>> {
     return characterNames(await this.getL10n(language))
+  }
+
+  /**
+   * Name lookups for characters, items, traits, weapons and tactical skills.
+   * Downloads the l10n file and two data tables once per language.
+   */
+  async getNames(language: string): Promise<GameNames> {
+    let loading = this.namesLoading.get(language)
+    if (!loading) {
+      loading = this.loadNames(language).catch((e) => {
+        this.namesLoading.delete(language)
+        throw e
+      })
+      this.namesLoading.set(language, loading)
+    }
+    return loading
+  }
+
+  private async loadNames(language: string): Promise<GameNames> {
+    const l10n = await this.getL10n(language)
+    const groups = await this.getData<TacticalSkillGroupRow>('TacticalSkillSetGroup')
+    const sets = await this.getData<TacticalSkillSetRow>('TacticalSkillSet')
+    return buildGameNames(l10n, groups, sets)
   }
 
   private async loadL10n(language: string): Promise<Map<string, string>> {

@@ -19,7 +19,7 @@ npm install eternal-return-api
 ## 사용
 
 ```ts
-import { ErClient, MatchingMode } from 'eternal-return-api'
+import { ErClient, MatchingMode, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -32,23 +32,60 @@ const seasonId = seasons.currentRankedSeasonId!
 const rank = await er.getUserRank(user.uid, seasonId)
 const stats = await er.getUserStats(user.uid, seasonId, MatchingMode.RANKED)
 
+// 공식 번역 파일의 이름
+const names = await er.getNames('Korean')
+
 // 최근 경기, 최신순, 페이지를 넘겨 가며
+const games = []
 for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-10-01') })) {
-  console.log(game.gameId, game.characterNum, game.gameRank)
+  games.push(game)
+  console.log(names.character(game.characterNum), names.weapon(game.bestWeapon), game.gameRank)
 }
+
+// 전체와 실험체별 승률, 평균 순위, 킬
+const { overall, characters } = summarizeGames(games)
 
 // 한 경기의 참가자 전원
 const players = await er.getGame(12345678)
-
-// 공식 번역 파일의 캐릭터 이름
-const names = await er.getCharacterNames('Korean')
 ```
+
+`getNames`는 경기 기록의 숫자 코드를 이름으로 바꿉니다. 실험체(`character`), 아이템(`item`), 특성(`trait`), 무기(`weapon`, `bestWeapon` 값), 전술 스킬(`tacticalSkill`, `tacticalSkillGroup` 값)을 지원하고, 모르는 코드는 `null`을 돌려줍니다.
+
+`summarizeGames`는 넣은 경기를 모드 구분 없이 합칩니다. 한 모드만 보려면 `matchingMode`로 먼저 거르세요.
 
 API 키는 [developer.eternalreturn.io](https://developer.eternalreturn.io)에서 받습니다. 키는 서버에만 두고 브라우저 코드에 넣지 마세요.
 
 메서드 목록과 옵션은 [영문 README](README.md#api)에 있습니다. 기본 설정은 초당 1회 요청이고, 키 한도에 맞게 `requestsPerSecond`를 바꾸면 됩니다.
 
 API 오류와 타임아웃은 `ErApiError`(`status`, `apiCode`)로 던지고, `fetch`의 네트워크 오류는 그대로 전파됩니다.
+
+## 디스코드 봇 예제
+
+[examples/discord-bot](examples/discord-bot)은 `/er 닉네임` 명령 하나짜리 봇입니다. 현재 랭크 RP, 최근 경기 요약, 많이 한 실험체, 최근 5경기를 보여 줍니다.
+
+## MCP 서버
+
+[MCP](https://modelcontextprotocol.io) 서버가 들어 있어서, Claude 같은 AI가 전적과 경기를 직접 조회할 수 있습니다.
+
+```json
+{
+  "mcpServers": {
+    "eternal-return": {
+      "command": "npx",
+      "args": ["-y", "-p", "eternal-return-api", "eternal-return-mcp"],
+      "env": { "ER_API_KEY": "API 키" }
+    }
+  }
+}
+```
+
+| 도구 | 입력 | 결과 |
+|---|---|---|
+| `player_profile` | `nickname`, `games`(1~50, 기본 20) | 랭크 RP, 최근 경기 요약(코발트 제외), 많이 한 실험체, 이름으로 바꾼 최근 경기 |
+| `game_detail` | `gameId` | 그 경기의 참가자 전원 |
+| `top_ranks` | `limit`(1~100, 기본 20) | 현재 랭크 시즌 상위 플레이어 |
+
+기본 언어는 한국어입니다. `ER_LANGUAGE`(예: `English`)로 바꿀 수 있습니다.
 
 ## ERCraft 운영 메모
 

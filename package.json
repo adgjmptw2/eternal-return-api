@@ -5,6 +5,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "eternal-return-mcp": "./dist/mcp.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -32,7 +35,8 @@
     "open-api",
     "game-api",
     "sdk",
-    "typescript"
+    "typescript",
+    "mcp"
   ],
   "license": "MIT",
   "author": "김정현 (https://github.com/adgjmptw2)",

@@ -12,15 +12,3 @@ export function parseL10n(text: string): Map<string, string> {
   }
   return entries
 }
-
-/** Picks `Character/Name/{code}` entries: character code → name. */
-export function characterNames(l10n: Map<string, string>): Map<number, string> {
-  const prefix = 'Character/Name/'
-  const names = new Map<number, string>()
-  for (const [key, value] of l10n) {
-    if (!key.startsWith(prefix)) continue
-    const code = Number(key.slice(prefix.length))
-    if (Number.isInteger(code) && code > 0) names.set(code, value)
-  }
-  return names
-}

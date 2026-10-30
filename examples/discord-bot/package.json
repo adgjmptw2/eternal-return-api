@@ -1,0 +1,12 @@
+{
+  "name": "eternal-return-discord-bot-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node bot.mjs"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "eternal-return-api": "^0.2.0"
+  }
+}
