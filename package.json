@@ -1,6 +1,6 @@
 {
   "name": "eternal-return-api",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unofficial TypeScript client for the Eternal Return Open API, extracted from ERCraft.",
   "type": "module",
   "main": "./dist/index.js",
