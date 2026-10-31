@@ -131,6 +131,8 @@ export interface GameNames {
   item(code: number | null | undefined): string | null
   trait(code: number | null | undefined): string | null
   weapon(bestWeapon: number | null | undefined): string | null
+  /** By weapon type key, e.g. `"Glove"` from `GameData.weaponsOf`. */
+  weaponType(key: string | null | undefined): string | null
   tacticalSkill(group: number | null | undefined): string | null
   /** Tier name, e.g. `tier(rankTier(rp).tier)`. Add the division yourself. */
   tier(key: TierKey): string | null
@@ -151,6 +153,10 @@ export function buildGameNames(
     item: lookup(items),
     trait: lookup(traits),
     weapon: (bestWeapon) => (bestWeapon == null ? null : weaponTypeName(l10n, bestWeapon)),
+    weaponType: (key) => {
+      const name = key ? l10n.get(`WeaponType/${key}`) : undefined
+      return name ? stripTags(name) || null : null
+    },
     tacticalSkill: lookup(tactical),
     tier: (key) => {
       const name = l10n.get(key === 'unranked' ? 'UNRANK' : key.toUpperCase())

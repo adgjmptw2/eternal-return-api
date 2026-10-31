@@ -1,5 +1,12 @@
 import { DEFAULT_CACHE_TTL_MS, cacheKindOf, type CacheKind, type CacheStore } from './cache.js'
 import { ErApiError, ErNicknameMismatchError } from './errors.js'
+import {
+  buildGameData,
+  type CharacterMasteryRow,
+  type GameData,
+  type ItemArmorRow,
+  type ItemWeaponRow,
+} from './gamedata.js'
 import { parseL10n } from './l10n.js'
 import { RateLimiter, defaultSleep, type Sleep } from './limiter.js'
 import { MatchingMode, TeamMode } from './modes.js'
@@ -97,6 +104,7 @@ export class ErClient {
   private seasonLoading: Promise<SeasonRow[]> | null = null
   private readonly l10nLoading = new Map<string, Promise<Map<string, string>>>()
   private readonly namesLoading = new Map<string, Promise<GameNames>>()
+  private gameDataLoading: Promise<GameData> | null = null
 
   constructor(options: ErClientOptions) {
     if (!options.apiKey) throw new TypeError('apiKey is required')
@@ -383,6 +391,25 @@ export class ErClient {
     }
     return loading
   }
+  /**
+   * Character weapons and item slots, grades and materials, from the
+   * `CharacterMastery`, `ItemWeapon` and `ItemArmor` tables. Loaded once per
+   * client; make a new client after a game patch.
+   */
+  async getGameData(): Promise<GameData> {
+    this.gameDataLoading ??= Promise.all([
+      this.getData<CharacterMasteryRow>('CharacterMastery'),
+      this.getData<ItemWeaponRow>('ItemWeapon'),
+      this.getData<ItemArmorRow>('ItemArmor'),
+    ])
+      .then(([mastery, weapons, armors]) => buildGameData(mastery, weapons, armors))
+      .catch((e) => {
+        this.gameDataLoading = null
+        throw e
+      })
+    return this.gameDataLoading
+  }
+
 
   private async loadNames(language: string): Promise<GameNames> {
     const l10n = await this.getL10n(language)

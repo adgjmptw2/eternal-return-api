@@ -80,6 +80,7 @@ Get an API key at [developer.eternalreturn.io](https://developer.eternalreturn.i
 | `getSeasons()` | `/v2/data/Season`, cached | throws |
 | `getL10n(language)`, `getCharacterNames(language)` | `/v1/l10n/{language}` + file download | throws |
 | `getNames(language)` | l10n + `TacticalSkillSetGroup`, `TacticalSkillSet`, cached | throws |
+| `getGameData()` | `CharacterMastery`, `ItemWeapon`, `ItemArmor`, cached | throws |
 | `request(path)` | any path | throws |
 
 API errors and timeouts throw `ErApiError` with `status` (HTTP status, or the body `code` when HTTP was 200) and `apiCode` (the body `code`). Network errors from `fetch` are passed through as-is.
@@ -130,6 +131,32 @@ new ErClient({
 ```
 
 All requests from one `ErClient` share one rate limiter. Use one client per key.
+
+## Game data
+
+`getGameData()` joins the character and item tables once, so you do not have to.
+
+```ts
+const data = await er.getGameData()
+data.weaponsOf(game.characterNum)  // ["OneHandSword", "TwoHandSword", ...]
+data.equipment(game).chest         // { code, slot, grade: "Legend", completed, materials, ... }
+names.weaponType('Glove')          // weapon type name in the chosen language
+```
+
+`itemGradeOf(5)` gives `"Legend"`: it turns an `equipmentGrade` number into `"Common"` … `"Mythic"`.
+
+## Testing without an API key
+
+`eternal-return-api/testing` serves anonymized real responses: two ranked games with every player, the leaderboard, and the tables and localization keys they need. Nicknames and game IDs are replaced, and RP and times are shifted, so rows do not point back at real players.
+
+```ts
+import { createSampleClient, SAMPLE_NICKNAME } from 'eternal-return-api/testing'
+
+const er = createSampleClient()
+const user = await er.getUserByNickname(SAMPLE_NICKNAME)
+```
+
+Requests not in the sample get the real API's not-found answer: HTTP 200 with `code: 404`. `sampleFetch()` is the `fetch` behind it, if you build the client yourself.
 
 ## Discord bot example
 

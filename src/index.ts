@@ -24,6 +24,16 @@ export {
 } from './names.js'
 export type { GameNames, TacticalSkillGroupRow, TacticalSkillSetRow } from './names.js'
 export { summarizeGames } from './summary.js'
+export { buildGameData, itemGradeOf, ITEM_GRADES, EQUIPMENT_SLOTS } from './gamedata.js'
+export type {
+  CharacterMasteryRow,
+  EquipSlot,
+  GameData,
+  ItemArmorRow,
+  ItemGrade,
+  ItemInfo,
+  ItemWeaponRow,
+} from './gamedata.js'
 export { groupTeams } from './teams.js'
 export { rankTier, LATEST_TIER_SEASON } from './tiers.js'
 export type { RankTier, RankTierOptions, TierKey } from './tiers.js'

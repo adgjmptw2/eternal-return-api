@@ -12,10 +12,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
     }
   },
   "files": [
     "dist",
+    "samples",
     "README.md",
     "README.ko.md",
     "GUIDE.md",

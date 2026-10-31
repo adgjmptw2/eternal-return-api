@@ -99,6 +99,32 @@ const cache = {
 
 API 오류와 타임아웃은 `ErApiError`(`status`, `apiCode`)로 던지고, `fetch`의 네트워크 오류는 그대로 전파됩니다.
 
+## 게임 데이터
+
+`getGameData()`는 실험체 테이블과 아이템 테이블을 한 번에 합쳐 줍니다.
+
+```ts
+const data = await er.getGameData()
+data.weaponsOf(game.characterNum)  // ["OneHandSword", "TwoHandSword", ...]
+data.equipment(game).chest         // { code, slot, grade: "Legend", completed, materials, ... }
+names.weaponType('Glove')          // 고른 언어의 무기 종류 이름
+```
+
+`itemGradeOf(5)`는 `"Legend"`입니다. `equipmentGrade` 숫자를 `"Common"` … `"Mythic"`으로 바꿉니다.
+
+## API 키 없이 테스트
+
+`eternal-return-api/testing`은 실제 응답으로 만든 샘플을 돌려줍니다. 실제 플레이어를 찾을 수 없게 닉네임과 경기 ID는 바꾸고, RP와 시간은 옮겼습니다. 랭크 2판의 참가자 전원, 상위 랭킹, 필요한 테이블과 번역 키가 들어 있습니다.
+
+```ts
+import { createSampleClient, SAMPLE_NICKNAME } from 'eternal-return-api/testing'
+
+const er = createSampleClient()
+const user = await er.getUserByNickname(SAMPLE_NICKNAME)
+```
+
+샘플에 없는 요청은 실제 API처럼 HTTP 200에 `code: 404`로 옵니다. 클라이언트를 직접 만들 때는 `sampleFetch()`를 `fetch`로 넣으면 됩니다.
+
 ## 디스코드 봇 예제
 
 [examples/discord-bot](https://github.com/adgjmptw2/eternal-return-api/tree/main/examples/discord-bot)은 `/er 닉네임` 명령 하나짜리 봇입니다. 현재 랭크 RP, 최근 경기 요약, 많이 한 실험체, 최근 5경기를 보여 줍니다.
