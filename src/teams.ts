@@ -3,15 +3,50 @@ import type { UserGame } from './types.js'
 export interface GameTeam {
   /** Null for a player without `teamNumber`; each such player is a team alone. */
   teamNumber: number | null
-  /** Team placement. Every member has the same `gameRank`. */
+  /**
+   * Team placement, from a member who did not give up and stayed longest
+   * (if all gave up, the one who stayed longest). A player who gave up can
+   * keep the rank and team kills from when they left.
+   */
   gameRank: number
   victory: boolean
-  /** `teamKill` from the API, or the sum of member kills when it is missing. */
+  /**
+   * `teamKill` from the same row as `gameRank`. If missing, the highest
+   * `teamKill` among members who did not give up, else the sum of member kills.
+   */
   teamKills: number
   assists: number
   damageToPlayer: number
   /** Most kills first. */
   players: UserGame[]
+}
+
+// A player who gave up keeps their rank and team kills from when they left,
+// so team values come from someone who stayed: not given up, longest duration.
+function stayScore(p: UserGame): [number, number] {
+  const duration = typeof p.duration === 'number' && Number.isFinite(p.duration) ? p.duration : -1
+  return [p.giveUp === 1 ? 0 : 1, duration]
+}
+
+function lastToLeave(members: UserGame[]): UserGame {
+  let best = members[0]!
+  let bestScore = stayScore(best)
+  for (const p of members) {
+    const score = stayScore(p)
+    if (score[0] > bestScore[0] || (score[0] === bestScore[0] && score[1] > bestScore[1])) {
+      best = p
+      bestScore = score
+    }
+  }
+  return best
+}
+
+function maxTeamKill(members: UserGame[]): number | undefined {
+  const values = members
+    .filter((p) => p.giveUp !== 1)
+    .map((p) => p.teamKill)
+    .filter((n): n is number => typeof n === 'number')
+  return values.length ? Math.max(...values) : undefined
 }
 
 /**
@@ -36,13 +71,13 @@ export function groupTeams(players: Iterable<UserGame>): GameTeam[] {
   }
   const teams: GameTeam[] = []
   for (const [teamNumber, members] of groups) {
-    const first = members[0]!
+    const last = lastToLeave(members)
     const kills = members.reduce((n, p) => n + (p.playerKill ?? 0), 0)
     teams.push({
       teamNumber,
-      gameRank: first.gameRank,
+      gameRank: last.gameRank,
       victory: members.some((p) => p.victory === 1),
-      teamKills: typeof first.teamKill === 'number' ? first.teamKill : kills,
+      teamKills: typeof last.teamKill === 'number' ? last.teamKill : maxTeamKill(members) ?? kills,
       assists: members.reduce((n, p) => n + (p.playerAssistant ?? 0), 0),
       damageToPlayer: members.reduce((n, p) => n + (p.damageToPlayer ?? 0), 0),
       players: [...members].sort((a, b) => (b.playerKill ?? 0) - (a.playerKill ?? 0)),

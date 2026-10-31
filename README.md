@@ -6,7 +6,7 @@ Unofficial TypeScript client for the [Eternal Return Open API](https://developer
 
 The code comes from [ERCraft](https://ercraft.net), an Eternal Return stats site that runs on this API. The parts that took debugging to get right are built in: rate limiting, 429 retries, error codes inside HTTP 200 responses, and field name changes between API versions.
 
-[한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/README.ko.md) · [API reference](https://adgjmptw2.github.io/eternal-return-api/)
+[한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/README.ko.md) · [API reference](https://adgjmptw2.github.io/eternal-return-api/) · [Field guide](GUIDE.md)
 
 - No runtime dependencies. Uses built-in `fetch`; Node 18+ (CI tests Node 18, 20, 22 and 24).
 - ESM only: `import`, not `require`.
@@ -161,7 +161,7 @@ Names are in Korean by default. Set `ER_LANGUAGE` (for example `English`) to cha
 
 ## Notes from running ERCraft
 
-Things we ran into in production.
+Things we ran into in production. The [field guide](GUIDE.md) has more: teams, RP, tiers and code lookups.
 
 - **HTTP 200 does not mean success.** Every response has `{ code, message }`. A request can come back HTTP 200 with an error `code` in the body. The client checks `code`.
 - **Nickname lookup returns `userId`, not `uid`.** The API returns `userId`, but the docs show `uid`. The client accepts both and always gives you `uid`.

@@ -119,3 +119,34 @@ test('groupTeams groups by team, best placement first', () => {
   assert.deepEqual(teams[0].players.map((x) => x.playerKill), [6, 2])
   assert.equal(teams[1].damageToPlayer, 200)
 })
+
+test('groupTeams takes rank and team kills from the member who stayed longest', () => {
+  // Live game: the player who gave up kept rank 5 and 14 team kills from when they left.
+  const p = (gameRank, teamKill, duration, giveUp) =>
+    ({ teamNumber: 1, gameRank, teamKill, duration, giveUp, playerKill: 1, victory: 0 })
+  const [team] = groupTeams([p(5, 14, 906, 1), p(3, 18, 1070, 0), p(3, 18, 1070, 0)])
+  assert.equal(team.gameRank, 3)
+  assert.equal(team.teamKills, 18)
+})
+
+test('groupTeams prefers members who did not give up, then the longest duration', () => {
+  const p = (gameRank, teamKill, duration, giveUp) =>
+    ({ teamNumber: 1, gameRank, teamKill, duration, giveUp, playerKill: 1, victory: 0 })
+  const pick = (rows) => { const [t] = groupTeams(rows); return [t.gameRank, t.teamKills] }
+  // Longest duration wins, in either order.
+  assert.deepEqual(pick([p(4, 10, 900, 0), p(3, 18, 1070, 0)]), [3, 18])
+  assert.deepEqual(pick([p(3, 18, 1070, 0), p(4, 10, 900, 0)]), [3, 18])
+  // Tie on duration: the member who gave up loses even when first.
+  assert.deepEqual(pick([p(5, 14, 1070, 1), p(3, 18, 1070, 0)]), [3, 18])
+  // A longer duration from a member who gave up still loses.
+  assert.deepEqual(pick([p(5, 14, 2000, 1), p(3, 18, 1070, 0)]), [3, 18])
+  // Missing or NaN duration does not hide a real one.
+  assert.deepEqual(pick([p(5, 14, NaN, 0), p(3, 18, 1070, 0)]), [3, 18])
+  assert.deepEqual(pick([p(5, 14, undefined, 0), p(3, 18, 1070, 0)]), [3, 18])
+  // Everyone gave up: the one who stayed longest.
+  assert.deepEqual(pick([p(5, 14, 900, 1), p(4, 16, 1000, 1)]), [4, 16])
+  // Chosen row lacks teamKill: highest among members who did not give up.
+  assert.deepEqual(pick([p(3, undefined, 1070, 0), p(3, 12, 900, 0), p(5, 20, 800, 1)]), [3, 12])
+  // No teamKill anywhere: sum of kills.
+  assert.deepEqual(pick([p(3, undefined, 1070, 0), p(3, undefined, 900, 0)]), [3, 2])
+})

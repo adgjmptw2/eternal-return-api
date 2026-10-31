@@ -1,3 +1,8 @@
+/**
+ * @packageDocumentation
+ * @document ../GUIDE.md
+ */
+
 export { ErClient, DEFAULT_BASE_URL } from './client.js'
 export type { ErClientOptions, UserGamesOptions } from './client.js'
 export { ErApiError, ErNicknameMismatchError } from './errors.js'
