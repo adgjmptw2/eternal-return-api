@@ -26,6 +26,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "docs": "typedoc",
     "test": "npm run build && node --test test/*.test.mjs",
     "prepublishOnly": "npm test"
   },
@@ -42,6 +43,7 @@
   "author": "김정현 (https://github.com/adgjmptw2)",
   "devDependencies": {
     "@types/node": "22.10.2",
+    "typedoc": "0.28.20",
     "typescript": "5.7.2"
   },
   "repository": {

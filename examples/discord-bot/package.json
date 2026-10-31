@@ -7,6 +7,6 @@
   },
   "dependencies": {
     "discord.js": "^14.16.3",
-    "eternal-return-api": "^0.3.0"
+    "eternal-return-api": "^0.4.0"
   }
 }

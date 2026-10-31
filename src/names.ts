@@ -1,3 +1,5 @@
+import type { TierKey } from './tiers.js'
+
 /**
  * `bestWeapon` number → weapon type key used by the official localization
  * (`WeaponType/{key}`). Numbers 12 and 17 are not used by current games.
@@ -125,11 +127,13 @@ type Code = number | null | undefined
 
 /** Name lookups for one language. Every method returns null for unknown or missing codes. */
 export interface GameNames {
-  character(code: Code): string | null
-  item(code: Code): string | null
-  trait(code: Code): string | null
-  weapon(bestWeapon: Code): string | null
-  tacticalSkill(group: Code): string | null
+  character(code: number | null | undefined): string | null
+  item(code: number | null | undefined): string | null
+  trait(code: number | null | undefined): string | null
+  weapon(bestWeapon: number | null | undefined): string | null
+  tacticalSkill(group: number | null | undefined): string | null
+  /** Tier name, e.g. `tier(rankTier(rp).tier)`. Add the division yourself. */
+  tier(key: TierKey): string | null
 }
 
 export function buildGameNames(
@@ -148,5 +152,9 @@ export function buildGameNames(
     trait: lookup(traits),
     weapon: (bestWeapon) => (bestWeapon == null ? null : weaponTypeName(l10n, bestWeapon)),
     tacticalSkill: lookup(tactical),
+    tier: (key) => {
+      const name = l10n.get(key === 'unranked' ? 'UNRANK' : key.toUpperCase())
+      return name ? stripTags(name) || null : null
+    },
   }
 }

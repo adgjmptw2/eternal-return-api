@@ -6,6 +6,8 @@
 
 전적 사이트 [ERCraft](https://ercraft.net)에서 쓰는 코드를 떼어 냈습니다. 요청 속도 제한, 429 재시도, HTTP 200 안에 든 오류 코드, API 버전마다 다른 필드 이름처럼 운영하면서 맞춰 온 부분이 들어 있습니다.
 
+[API 문서](https://adgjmptw2.github.io/eternal-return-api/)
+
 - 런타임 의존성 없음. 내장 `fetch` 사용, Node 18 이상(CI에서 Node 18, 20, 22, 24 테스트).
 - ESM 전용: `require`가 아니라 `import`로 씁니다.
 - 자주 쓰는 응답은 타입이 있고, 모르는 필드도 그대로 남습니다.
@@ -19,7 +21,7 @@ npm install eternal-return-api
 ## 사용
 
 ```ts
-import { ErClient, MatchingMode, groupTeams, summarizeGames } from 'eternal-return-api'
+import { ErClient, MatchingMode, groupTeams, rankTier, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -34,6 +36,10 @@ const stats = await er.getUserStats(user.uid, seasonId, MatchingMode.RANKED)
 
 // 공식 번역 파일의 이름
 const names = await er.getNames('Korean')
+
+// RP로 티어 계산(데미갓·이터니티는 순위도 필요)
+const tier = rankTier(rank?.mmr ?? 0, { rank: rank?.rank, season: seasons.playerSeasonOf(seasonId) })
+console.log(names.tier(tier.tier), tier.division) // "다이아몬드" 2
 
 // 최근 경기, 최신순, 페이지를 넘겨 가며
 const games = []
@@ -50,6 +56,8 @@ const teams = groupTeams(await er.getGame(12345678))
 ```
 
 `getNames`는 경기 기록의 숫자 코드를 이름으로 바꿉니다. 실험체(`character`), 아이템(`item`), 특성(`trait`), 무기(`weapon`, `bestWeapon` 값), 전술 스킬(`tacticalSkill`, `tacticalSkillGroup` 값)을 지원하고, 모르는 코드는 `null`을 돌려줍니다.
+
+`rankTier`는 RP를 티어와 단계로 바꿉니다. 시즌별 구간은 ERCraft와 같은 표를 씁니다. 데미갓과 이터니티는 순위로 정해지니 `rank`를 넣어야 하고, 없으면 미스릴까지만 나옵니다. 패키지에 없는 새 시즌은 마지막 시즌 표를 씁니다. `names.tier`는 언어별 티어 이름만 돌려주니, 단계 숫자는 직접 붙이세요.
 
 `groupTeams`는 팀을 순위순으로 정렬하고 팀 킬, 어시스트, 딜량을 더해 줍니다.
 
@@ -93,7 +101,7 @@ API 오류와 타임아웃은 `ErApiError`(`status`, `apiCode`)로 던지고, `f
 
 ## 디스코드 봇 예제
 
-[examples/discord-bot](examples/discord-bot)은 `/er 닉네임` 명령 하나짜리 봇입니다. 현재 랭크 RP, 최근 경기 요약, 많이 한 실험체, 최근 5경기를 보여 줍니다.
+[examples/discord-bot](https://github.com/adgjmptw2/eternal-return-api/tree/main/examples/discord-bot)은 `/er 닉네임` 명령 하나짜리 봇입니다. 현재 랭크 RP, 최근 경기 요약, 많이 한 실험체, 최근 5경기를 보여 줍니다.
 
 ## MCP 서버
 
@@ -113,7 +121,7 @@ API 오류와 타임아웃은 `ErApiError`(`status`, `apiCode`)로 던지고, `f
 
 | 도구 | 입력 | 결과 |
 |---|---|---|
-| `player_profile` | `nickname`, `games`(1~50, 기본 20) | 랭크 RP, 최근 경기 요약(코발트 제외), 많이 한 실험체, 이름으로 바꾼 최근 경기 |
+| `player_profile` | `nickname`, `games`(1~50, 기본 20) | 랭크 티어와 RP, 최근 경기 요약(코발트 제외), 많이 한 실험체, 이름으로 바꾼 최근 경기 |
 | `game_detail` | `gameId` | 그 경기의 참가자 전원, 팀별로 |
 | `top_ranks` | `limit`(1~100, 기본 20) | 현재 랭크 시즌 상위 플레이어 |
 

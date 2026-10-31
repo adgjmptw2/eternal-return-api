@@ -1,0 +1,21 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts"
+  ],
+  "out": "docs",
+  "name": "eternal-return-api",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "sort": [
+    "kind",
+    "source-order"
+  ],
+  "navigationLinks": {
+    "GitHub": "https://github.com/adgjmptw2/eternal-return-api",
+    "npm": "https://www.npmjs.com/package/eternal-return-api"
+  },
+  "sourceLinkTemplate": "https://github.com/adgjmptw2/eternal-return-api/blob/{gitRevision}/{path}#L{line}"
+}

@@ -14,6 +14,7 @@ import { MatchingMode, TeamMode, gameModeName } from './modes.js'
 import type { GameNames } from './names.js'
 import { summarizeGames, type GameSummary } from './summary.js'
 import { groupTeams } from './teams.js'
+import { rankTier } from './tiers.js'
 import type { UserGame } from './types.js'
 
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
@@ -28,7 +29,7 @@ const TOOLS = [
   {
     name: 'player_profile',
     description:
-      'Eternal Return player: current squad ranked RP and rank, a summary of recent games (Cobalt Protocol excluded, last 90 days at most), most played characters, and the recent games with character, weapon, tactical skill, traits and items as names.',
+      'Eternal Return player: current squad ranked tier, RP and rank, a summary of recent games (Cobalt Protocol excluded, last 90 days at most), most played characters, and the recent games with character, weapon, tactical skill, traits and items as names.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -109,6 +110,13 @@ function gameJson(game: UserGame, names: GameNames): Json {
   }
 }
 
+function tierText(names: GameNames, rp: number, rank: number, season: number | null): string {
+  const tier = rankTier(rp, { rank, season })
+  const name = names.tier(tier.tier)
+  if (!name) return tier.name
+  return tier.division === null ? name : `${name} ${tier.division}`
+}
+
 async function playerProfile(er: ErClient, args: Json): Promise<Json> {
   const nickname = typeof args.nickname === 'string' ? args.nickname.trim() : ''
   if (!nickname) throw new ToolInputError('nickname is required')
@@ -119,6 +127,7 @@ async function playerProfile(er: ErClient, args: Json): Promise<Json> {
   const names = await er.getNames(LANGUAGE)
   const seasons = await er.getSeasons()
   const seasonId = seasons.currentRankedSeasonId
+  const season = seasonId === null ? null : seasons.playerSeasonOf(seasonId)
   const rank = seasonId === null ? null : await er.getUserRank(user.uid, seasonId)
 
   const games: UserGame[] = []
@@ -131,8 +140,8 @@ async function playerProfile(er: ErClient, args: Json): Promise<Json> {
   return {
     found: true,
     nickname: user.nickname,
-    season: seasonId === null ? null : seasons.playerSeasonOf(seasonId),
-    squadRank: rank && rank.mmr > 0 ? { rp: rank.mmr, rank: rank.rank } : null,
+    season,
+    squadRank: rank && rank.mmr > 0 ? { tier: tierText(names, rank.mmr, rank.rank, season), rp: rank.mmr, rank: rank.rank } : null,
     recent: summaryJson(summary.overall),
     characters: summary.characters.slice(0, 5).map((c) => ({
       character: names.character(c.characterNum) ?? c.characterNum,

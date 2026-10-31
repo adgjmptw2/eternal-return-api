@@ -1,4 +1,4 @@
-import { gameModeName, summarizeGames } from 'eternal-return-api'
+import { gameModeName, rankTier, summarizeGames } from 'eternal-return-api'
 
 const MODE_LABEL = { normal: '일반', rank: '랭크', cobalt: '코발트', loneWolf: '론울프', unknown: '기타' }
 
@@ -29,7 +29,10 @@ const pct = (x) => `${Math.round(x * 100)}%`
 export function profileText({ user, season, rank, games, summary, names }) {
   const lines = []
   if (rank && rank.mmr > 0) {
-    lines.push(`시즌 ${season} 스쿼드 랭크: ${rank.mmr.toLocaleString()} RP · ${rank.rank.toLocaleString()}위`)
+    const tier = rankTier(rank.mmr, { rank: rank.rank, season })
+    const localName = names.tier(tier.tier)
+    const tierName = !localName ? tier.name : tier.division === null ? localName : `${localName} ${tier.division}`
+    lines.push(`시즌 ${season} 스쿼드 랭크: ${tierName} · ${rank.mmr.toLocaleString()} RP · ${rank.rank.toLocaleString()}위`)
   } else {
     lines.push(`시즌 ${season ?? '?'} 스쿼드 랭크 기록 없음`)
   }

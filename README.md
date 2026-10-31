@@ -6,7 +6,7 @@ Unofficial TypeScript client for the [Eternal Return Open API](https://developer
 
 The code comes from [ERCraft](https://ercraft.net), an Eternal Return stats site that runs on this API. The parts that took debugging to get right are built in: rate limiting, 429 retries, error codes inside HTTP 200 responses, and field name changes between API versions.
 
-[한국어](README.ko.md)
+[한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/README.ko.md) · [API reference](https://adgjmptw2.github.io/eternal-return-api/)
 
 - No runtime dependencies. Uses built-in `fetch`; Node 18+ (CI tests Node 18, 20, 22 and 24).
 - ESM only: `import`, not `require`.
@@ -21,7 +21,7 @@ npm install eternal-return-api
 ## Use
 
 ```ts
-import { ErClient, MatchingMode, groupTeams, summarizeGames } from 'eternal-return-api'
+import { ErClient, MatchingMode, groupTeams, rankTier, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -36,6 +36,10 @@ const stats = await er.getUserStats(user.uid, seasonId, MatchingMode.RANKED)
 
 // Names from the official localization file
 const names = await er.getNames('English')
+
+// Tier from RP. The top two tiers also need the leaderboard rank.
+const tier = rankTier(rank?.mmr ?? 0, { rank: rank?.rank, season: seasons.playerSeasonOf(seasonId) })
+console.log(tier.name, names.tier(tier.tier)) // "Diamond 2" "Diamond"
 
 // Recent games, newest first, across pages
 const games = []
@@ -52,6 +56,8 @@ const teams = groupTeams(await er.getGame(12345678))
 ```
 
 `getNames` turns the codes in game records into names: `character`, `item`, `trait`, `weapon` (`bestWeapon`) and `tacticalSkill` (`tacticalSkillGroup`). Each returns `null` for unknown codes.
+
+`rankTier` turns RP into a tier and division, using the same season tables as ERCraft. Titan and Immortal (keys `demigod` and `eternity`) depend on leaderboard rank, so pass `rank`. Without it, the highest result is Mythril. Seasons newer than the package use the latest table. `names.tier` returns just the tier name in the chosen language, without the division.
 
 `groupTeams` sorts teams by placement and adds team kills, assists and damage.
 
@@ -127,7 +133,7 @@ All requests from one `ErClient` share one rate limiter. Use one client per key.
 
 ## Discord bot example
 
-[examples/discord-bot](examples/discord-bot) is a bot with one command, `/er nickname`. It shows current ranked RP, a recent games summary, most played characters and the last five games.
+[examples/discord-bot](https://github.com/adgjmptw2/eternal-return-api/tree/main/examples/discord-bot) is a bot with one command, `/er nickname`. It shows current ranked RP, a recent games summary, most played characters and the last five games.
 
 ## MCP server
 
@@ -147,7 +153,7 @@ The package includes an [MCP](https://modelcontextprotocol.io) server, so AI ass
 
 | Tool | Input | Returns |
 |---|---|---|
-| `player_profile` | `nickname`, `games` (1-50, default 20) | ranked RP, recent games summary (Cobalt Protocol excluded), most played characters, recent games with names |
+| `player_profile` | `nickname`, `games` (1-50, default 20) | ranked tier and RP, recent games summary (Cobalt Protocol excluded), most played characters, recent games with names |
 | `game_detail` | `gameId` | everyone in the game, by team |
 | `top_ranks` | `limit` (1-100, default 20) | top players of the current ranked season |
 
