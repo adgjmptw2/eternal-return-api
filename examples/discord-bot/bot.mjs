@@ -1,10 +1,11 @@
 // Discord bot with one command: /er nickname
 // Env: DISCORD_TOKEN, ER_API_KEY, optional GUILD_ID (registers the command in one server, instantly)
 import { Client, EmbedBuilder, Events, GatewayIntentBits, SlashCommandBuilder } from 'discord.js'
-import { ErClient, ErNicknameMismatchError } from 'eternal-return-api'
+import { ErClient, ErNicknameMismatchError, MemoryCache } from 'eternal-return-api'
 import { loadProfile, profileText } from './profile.mjs'
 
-const er = new ErClient({ apiKey: process.env.ER_API_KEY })
+// The cache lets repeated lookups skip the 1 request/second limit.
+const er = new ErClient({ apiKey: process.env.ER_API_KEY, cache: new MemoryCache() })
 
 const command = new SlashCommandBuilder()
   .setName('er')

@@ -7,11 +7,13 @@
  */
 import { readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
+import { MemoryCache } from './cache.js'
 import { ErClient } from './client.js'
 import { ErApiError, ErNicknameMismatchError } from './errors.js'
 import { MatchingMode, TeamMode, gameModeName } from './modes.js'
 import type { GameNames } from './names.js'
 import { summarizeGames, type GameSummary } from './summary.js'
+import { groupTeams } from './teams.js'
 import type { UserGame } from './types.js'
 
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
@@ -38,7 +40,7 @@ const TOOLS = [
   },
   {
     name: 'game_detail',
-    description: 'Every player in one Eternal Return game: team, rank, character, weapon, kills, assists, damage.',
+    description: 'One Eternal Return game by team, best placement first: team kills and every player with character, weapon, kills, assists, damage.',
     inputSchema: {
       type: 'object',
       properties: { gameId: { type: 'integer', description: 'Game ID from player_profile' } },
@@ -151,18 +153,20 @@ async function gameDetail(er: ErClient, args: Json): Promise<Json> {
     gameId,
     startDtm: first.startDtm,
     mode: gameModeName(first.matchingMode),
-    players: [...players]
-      .sort((a, b) => a.gameRank - b.gameRank || (a.teamNumber ?? 0) - (b.teamNumber ?? 0))
-      .map((p) => ({
+    teams: groupTeams(players).map((team) => ({
+      team: team.teamNumber,
+      rank: team.gameRank,
+      victory: team.victory,
+      teamKills: team.teamKills,
+      players: team.players.map((p) => ({
         nickname: p.nickname ?? null,
-        team: p.teamNumber ?? null,
-        rank: p.gameRank,
         character: names.character(p.characterNum) ?? p.characterNum,
         weapon: names.weapon(p.bestWeapon),
         kills: p.playerKill,
         assists: p.playerAssistant,
         damageToPlayer: p.damageToPlayer ?? null,
       })),
+    })),
   }
 }
 
@@ -279,7 +283,7 @@ function main(): void {
     console.error('ER_API_KEY is not set')
     process.exit(1)
   }
-  const er = new ErClient({ apiKey })
+  const er = new ErClient({ apiKey, cache: new MemoryCache({ maxEntries: 500 }) })
   const lines = createInterface({ input: process.stdin })
   lines.on('line', (line) => {
     if (!line.trim()) return

@@ -1,3 +1,4 @@
+import { DEFAULT_CACHE_TTL_MS, cacheKindOf, type CacheKind, type CacheStore } from './cache.js'
 import { ErApiError, ErNicknameMismatchError } from './errors.js'
 import { parseL10n } from './l10n.js'
 import { RateLimiter, defaultSleep, type Sleep } from './limiter.js'
@@ -34,6 +35,15 @@ export interface ErClientOptions {
   retryDelaysMs?: number[]
   /** How long the season table is cached. Default 5 minutes. */
   seasonCacheTtlMs?: number
+  /**
+   * Response cache, off by default. Pass `new MemoryCache()` or your own store
+   * (Redis etc.). Only successful responses are cached.
+   */
+  cache?: CacheStore
+  /** Per kind of response, in ms. Defaults: `DEFAULT_CACHE_TTL_MS`. 0 disables a kind. */
+  cacheTtlMs?: Partial<Record<CacheKind, number>>
+  /** A cache read slower than this counts as a miss. Default 1000. */
+  cacheTimeoutMs?: number
   baseUrl?: string
   fetch?: typeof fetch
   /** For tests. */
@@ -78,6 +88,10 @@ export class ErClient {
   private readonly sleep: Sleep
   private readonly now: () => number
   private readonly limiter: RateLimiter
+  private readonly cache: CacheStore | null
+  private readonly cacheTtlMs: Record<CacheKind, number>
+  private readonly cacheTimeoutMs: number
+  private readonly inFlight = new Map<string, Promise<string>>()
 
   private seasonCache: { value: SeasonRow[]; expiresAt: number } | null = null
   private seasonLoading: Promise<SeasonRow[]> | null = null
@@ -100,13 +114,54 @@ export class ErClient {
     this.sleep = options.sleep ?? defaultSleep
     this.now = options.now ?? Date.now
     this.limiter = new RateLimiter(Math.ceil(1_000 / rps), burst, this.now, this.sleep)
+    this.cache = options.cache ?? null
+    this.cacheTtlMs = { ...DEFAULT_CACHE_TTL_MS, ...options.cacheTtlMs }
+    this.cacheTimeoutMs = options.cacheTimeoutMs ?? 1_000
   }
 
   /**
    * Calls any Open API path and returns the body. Rate limit, 429 retries and
    * the `code` check apply. Use it for endpoints this client does not wrap.
    */
+  /**
+   * GET a path on the API and return the parsed body. Uses the cache when one
+   * is set; concurrent calls for the same path then share one request.
+   */
   async request(path: string): Promise<Envelope> {
+    const cache = this.cache
+    const ttl = this.cacheTtlMs[cacheKindOf(path)]
+    if (!cache || !(ttl > 0)) return this.requestWithRetry(path)
+
+    const key = `er:${path}`
+    let loading = this.inFlight.get(key)
+    if (!loading) {
+      loading = this.loadThroughCache(cache, key, path, ttl).finally(() => this.inFlight.delete(key))
+      this.inFlight.set(key, loading)
+    }
+    // Parse per caller so no two callers share one object.
+    return JSON.parse(await loading) as Envelope
+  }
+
+  /** A slow or broken cache must not block or break requests. */
+  private async loadThroughCache(cache: CacheStore, key: string, path: string, ttl: number): Promise<string> {
+    try {
+      const hit = await withTimeout(Promise.resolve(cache.get(key)), this.cacheTimeoutMs)
+      if (hit) {
+        JSON.parse(hit)
+        return hit
+      }
+    } catch {
+      // Treat as a miss.
+    }
+    const text = JSON.stringify(await this.requestWithRetry(path))
+    // Not awaited: the caller already has its answer.
+    Promise.resolve()
+      .then(() => cache.set(key, text, ttl))
+      .catch(() => {})
+    return text
+  }
+
+  private async requestWithRetry(path: string): Promise<Envelope> {
     for (let attempt = 0; ; attempt++) {
       await this.limiter.acquire()
       try {
@@ -347,4 +402,12 @@ export class ErClient {
     if (!res.ok) throw new ErApiError(res.status, `l10n download failed (HTTP ${res.status})`)
     return parseL10n(text)
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('cache timeout')), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }

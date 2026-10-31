@@ -19,6 +19,10 @@ export {
 } from './names.js'
 export type { GameNames, TacticalSkillGroupRow, TacticalSkillSetRow } from './names.js'
 export { summarizeGames } from './summary.js'
+export { groupTeams } from './teams.js'
+export type { GameTeam } from './teams.js'
+export { MemoryCache, DEFAULT_CACHE_TTL_MS, cacheKindOf } from './cache.js'
+export type { CacheKind, CacheStore } from './cache.js'
 export type { CharacterSummary, GameSummary, GamesSummary } from './summary.js'
 export { RateLimiter } from './limiter.js'
 export type {

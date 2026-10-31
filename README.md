@@ -21,7 +21,7 @@ npm install eternal-return-api
 ## Use
 
 ```ts
-import { ErClient, MatchingMode, summarizeGames } from 'eternal-return-api'
+import { ErClient, MatchingMode, groupTeams, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -47,11 +47,13 @@ for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-1
 // Win rate, average rank and kills, overall and per character
 const { overall, characters } = summarizeGames(games)
 
-// Everyone in one game
-const players = await er.getGame(12345678)
+// Everyone in one game, grouped by team
+const teams = groupTeams(await er.getGame(12345678))
 ```
 
 `getNames` turns the codes in game records into names: `character`, `item`, `trait`, `weapon` (`bestWeapon`) and `tacticalSkill` (`tacticalSkillGroup`). Each returns `null` for unknown codes.
+
+`groupTeams` sorts teams by placement and adds team kills, assists and damage.
 
 `summarizeGames` combines all modes passed in. Filter by `matchingMode` first if you need one mode.
 
@@ -76,6 +78,36 @@ Get an API key at [developer.eternalreturn.io](https://developer.eternalreturn.i
 
 API errors and timeouts throw `ErApiError` with `status` (HTTP status, or the body `code` when HTTP was 200) and `apiCode` (the body `code`). Network errors from `fetch` are passed through as-is.
 
+### Cache
+
+The API allows about one request per second, so a bot with many users hits the rate limit quickly. A cache answers repeated lookups without calling the API. Disabled by default.
+
+```ts
+import { ErClient, MemoryCache } from 'eternal-return-api'
+
+const er = new ErClient({ apiKey, cache: new MemoryCache({ maxEntries: 1000 }) })
+```
+
+Only successful responses are cached. While one request is in flight, the same request from other callers waits for it instead of calling the API again. A cache that fails or takes longer than `cacheTimeoutMs` (default 1 second) to answer counts as a miss, so it never blocks requests.
+
+| Kind | Default |
+|---|---|
+| `nickname` | 10 minutes |
+| `userGames`, `rank` | 1 minute |
+| `topRanks`, `stats` | 5 minutes |
+| `game`, `data` | 1 hour |
+
+Change them with `cacheTtlMs`, for example `{ userGames: 30_000 }`. `0` turns a kind off.
+
+To share a cache between processes, pass any object with `get` and `set`. With [node-redis](https://github.com/redis/node-redis):
+
+```ts
+const cache = {
+  get: (key) => redis.get(key),
+  set: (key, value, ttlMs) => redis.set(key, value, { PX: ttlMs }),
+}
+```
+
 ### Options
 
 ```ts
@@ -86,6 +118,8 @@ new ErClient({
   timeoutMs: 9000,
   retryDelaysMs: [1500, 3000], // waits after HTTP 429; [] to disable
   seasonCacheTtlMs: 300000,
+  cache: new MemoryCache(),  // off by default; see Cache
+  cacheTtlMs: { userGames: 60000 },
 })
 ```
 
@@ -114,7 +148,7 @@ The package includes an [MCP](https://modelcontextprotocol.io) server, so AI ass
 | Tool | Input | Returns |
 |---|---|---|
 | `player_profile` | `nickname`, `games` (1-50, default 20) | ranked RP, recent games summary (Cobalt Protocol excluded), most played characters, recent games with names |
-| `game_detail` | `gameId` | everyone in the game |
+| `game_detail` | `gameId` | everyone in the game, by team |
 | `top_ranks` | `limit` (1-100, default 20) | top players of the current ranked season |
 
 Names are in Korean by default. Set `ER_LANGUAGE` (for example `English`) to change it.

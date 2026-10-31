@@ -19,7 +19,7 @@ npm install eternal-return-api
 ## 사용
 
 ```ts
-import { ErClient, MatchingMode, summarizeGames } from 'eternal-return-api'
+import { ErClient, MatchingMode, groupTeams, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -45,15 +45,47 @@ for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-1
 // 전체와 실험체별 승률, 평균 순위, 킬
 const { overall, characters } = summarizeGames(games)
 
-// 한 경기의 참가자 전원
-const players = await er.getGame(12345678)
+// 한 경기의 참가자 전원, 팀별로
+const teams = groupTeams(await er.getGame(12345678))
 ```
 
 `getNames`는 경기 기록의 숫자 코드를 이름으로 바꿉니다. 실험체(`character`), 아이템(`item`), 특성(`trait`), 무기(`weapon`, `bestWeapon` 값), 전술 스킬(`tacticalSkill`, `tacticalSkillGroup` 값)을 지원하고, 모르는 코드는 `null`을 돌려줍니다.
 
+`groupTeams`는 팀을 순위순으로 정렬하고 팀 킬, 어시스트, 딜량을 더해 줍니다.
+
 `summarizeGames`는 넣은 경기를 모드 구분 없이 합칩니다. 한 모드만 보려면 `matchingMode`로 먼저 거르세요.
 
 API 키는 [developer.eternalreturn.io](https://developer.eternalreturn.io)에서 받습니다. 키는 서버에만 두고 브라우저 코드에 넣지 마세요.
+
+## 캐시
+
+API는 초당 1회 정도만 허용해서, 사용자가 많은 봇은 금방 막힙니다. 캐시를 켜면 같은 조회는 API를 다시 부르지 않습니다. 기본적으로 꺼져 있습니다.
+
+```ts
+import { ErClient, MemoryCache } from 'eternal-return-api'
+
+const er = new ErClient({ apiKey, cache: new MemoryCache({ maxEntries: 1000 }) })
+```
+
+성공한 응답만 저장합니다. 같은 요청이 진행 중이면 다른 호출은 새로 부르지 않고 그 결과를 기다립니다. 캐시가 오류를 내거나 `cacheTimeoutMs`(기본 1초) 안에 답하지 않으면 없는 것으로 보고 API를 부르므로, 캐시 때문에 요청이 멈추지는 않습니다.
+
+| 종류 | 기본 |
+|---|---|
+| `nickname` | 10분 |
+| `userGames`, `rank` | 1분 |
+| `topRanks`, `stats` | 5분 |
+| `game`, `data` | 1시간 |
+
+`cacheTtlMs`로 바꿀 수 있습니다(예: `{ userGames: 30_000 }`). `0`이면 그 종류는 저장하지 않습니다.
+
+여러 프로세스가 캐시를 함께 쓰려면 `get`과 `set`이 있는 객체를 넘기면 됩니다. [node-redis](https://github.com/redis/node-redis) 예:
+
+```ts
+const cache = {
+  get: (key) => redis.get(key),
+  set: (key, value, ttlMs) => redis.set(key, value, { PX: ttlMs }),
+}
+```
 
 메서드 목록과 옵션은 [영문 README](README.md#api)에 있습니다. 기본 설정은 초당 1회 요청이고, 키 한도에 맞게 `requestsPerSecond`를 바꾸면 됩니다.
 
@@ -82,7 +114,7 @@ API 오류와 타임아웃은 `ErApiError`(`status`, `apiCode`)로 던지고, `f
 | 도구 | 입력 | 결과 |
 |---|---|---|
 | `player_profile` | `nickname`, `games`(1~50, 기본 20) | 랭크 RP, 최근 경기 요약(코발트 제외), 많이 한 실험체, 이름으로 바꾼 최근 경기 |
-| `game_detail` | `gameId` | 그 경기의 참가자 전원 |
+| `game_detail` | `gameId` | 그 경기의 참가자 전원, 팀별로 |
 | `top_ranks` | `limit`(1~100, 기본 20) | 현재 랭크 시즌 상위 플레이어 |
 
 기본 언어는 한국어입니다. `ER_LANGUAGE`(예: `English`)로 바꿀 수 있습니다.
