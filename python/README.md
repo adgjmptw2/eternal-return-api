@@ -167,4 +167,4 @@ user = er.get_user_by_nickname(SAMPLE_NICKNAME)
 
 ## License
 
-MIT. Not affiliated with or endorsed by Nimble Neuron.
+MIT, for the code of this library only. Game data, text and other resources belong to Nimble Neuron and are not covered by this license. This is an unofficial project, not affiliated with or endorsed by Nimble Neuron.

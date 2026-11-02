@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Game data table guide (`DATA.md`, `DATA.ko.md`): what each of the 44 published tables holds and how they link to each other and to game records.
+- The READMEs state that the MIT license covers the code only, not game data or resources.
+
 ## 0.7.1
 
 - The sample data in `eternal-return-api/testing` is now made up: nothing in it comes from the API. Earlier versions bundled anonymized real responses.

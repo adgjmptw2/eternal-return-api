@@ -6,7 +6,7 @@ Unofficial TypeScript client for the [Eternal Return Open API](https://developer
 
 The code comes from [ERCraft](https://ercraft.net), an Eternal Return stats site that runs on this API. The parts that took debugging to get right are built in: rate limiting, 429 retries, error codes inside HTTP 200 responses, and field name changes between API versions.
 
-[한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/README.ko.md) · [API reference](https://adgjmptw2.github.io/eternal-return-api/) · [Field guide](GUIDE.md)
+[한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/README.ko.md) · [API reference](https://adgjmptw2.github.io/eternal-return-api/) · [Field guide](GUIDE.md) · [Game data tables](DATA.md)
 
 - No runtime dependencies. Uses built-in `fetch`; Node 18+ (CI tests Node 18, 20, 22 and 24).
 - ESM only: `import`, not `require`.
@@ -258,4 +258,4 @@ Things we ran into in production. The [field guide](GUIDE.md) has more: teams, R
 
 ## License
 
-MIT. Not affiliated with or endorsed by Nimble Neuron.
+MIT, for the code of this library only. Game data, text and other resources belong to Nimble Neuron and are not covered by this license. This is an unofficial project, not affiliated with or endorsed by Nimble Neuron.

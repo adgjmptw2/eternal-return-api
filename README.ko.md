@@ -6,7 +6,7 @@
 
 전적 사이트 [ERCraft](https://ercraft.net)에서 쓰는 코드를 떼어 냈습니다. 요청 속도 제한, 429 재시도, HTTP 200 안에 든 오류 코드, API 버전마다 다른 필드 이름처럼 운영하면서 맞춰 온 부분이 들어 있습니다.
 
-[API 문서](https://adgjmptw2.github.io/eternal-return-api/) · [실전 가이드](GUIDE.ko.md)
+[API 문서](https://adgjmptw2.github.io/eternal-return-api/) · [실전 가이드](GUIDE.ko.md) · [게임 데이터 표](DATA.ko.md)
 
 - 런타임 의존성 없음. 내장 `fetch` 사용, Node 18 이상(CI에서 Node 18, 20, 22, 24 테스트).
 - ESM 전용: `require`가 아니라 `import`로 씁니다.
@@ -223,4 +223,4 @@ const user = await er.getUserByNickname(SAMPLE_NICKNAME)
 
 ## 라이선스
 
-MIT. 님블뉴런과 관계없는 비공식 프로젝트입니다.
+MIT 라이선스는 이 라이브러리의 코드에만 적용됩니다. 게임 데이터, 텍스트 등 리소스의 권리는 님블뉴런에 있으며 이 라이선스와 별개입니다. 님블뉴런과 관계없는 비공식 프로젝트입니다.
