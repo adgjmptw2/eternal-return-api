@@ -148,7 +148,7 @@ ErClient(
 
 ## API 키 없이 테스트
 
-`eternal_return_api.testing`은 실제 응답을 익명화한 샘플을 돌려줍니다. 참가자 전원이 있는 랭크 경기 2판, 상위 랭킹, 그에 필요한 데이터 표와 번역 키가 들어 있습니다.
+`eternal_return_api.testing`은 실제 API 응답과 같은 모양으로 지어낸 샘플을 돌려줍니다. 랭크 2판의 참가자 전원, 상위 랭킹, 필요한 데이터 표와 번역 키가 들어 있습니다. API에서 가져온 것은 없고 이름, 코드, 숫자는 모두 지어낸 값입니다. 필드 이름과 필드 사이의 관계는 실전 가이드에 적은 실제 API 그대로입니다.
 
 ```python
 from eternal_return_api.testing import SAMPLE_NICKNAME, sample_client

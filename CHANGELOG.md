@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- The sample data in `eternal-return-api/testing` is now made up: nothing in it comes from the API. Earlier versions bundled anonymized real responses.
+
 ## 0.7.0
 
 - `syncUserGames(uid, { after })`: only games newer than the newest one you have. Paging stops at `after`, so a few new games cost one request. With `maxPages`, `rest` fetches the games in between, and `newestGameId` does not move past them until they are fetched.

@@ -148,7 +148,7 @@ Off by default. `MemoryCache()` keeps responses in memory; any object with `get(
 
 ## Testing without an API key
 
-`eternal_return_api.testing` serves anonymized real responses: two ranked games with every player, the leaderboard, and the tables and localization keys they need.
+`eternal_return_api.testing` serves made-up responses in the shape of the real API: two ranked games with every player, the leaderboard, and the tables and localization keys they need. Nothing in them comes from the API: names, codes and numbers are invented. The field names and the relations between fields follow the real API, as described in the field guide.
 
 ```python
 from eternal_return_api.testing import SAMPLE_NICKNAME, sample_client

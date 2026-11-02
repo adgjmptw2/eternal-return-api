@@ -28,7 +28,7 @@ from .seasons import SeasonCatalog, parse_season_number, to_player_season
 from .tiers import LATEST_TIER_SEASON, RankTier, TierKey, rank_tier
 from .types import Envelope, ErUser, UserGame
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "DEFAULT_BASE_URL",

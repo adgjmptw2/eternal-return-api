@@ -193,7 +193,7 @@ names.weaponType('Glove')          // weapon type name in the chosen language
 
 ## Testing without an API key
 
-`eternal-return-api/testing` serves anonymized real responses: two ranked games with every player, the leaderboard, and the tables and localization keys they need. Nicknames and game IDs are replaced, and RP and times are shifted, so rows do not point back at real players.
+`eternal-return-api/testing` serves made-up responses in the shape of the real API: two ranked games with every player, the leaderboard, and the tables and localization keys they need. Nothing in them comes from the API: names, codes and numbers are invented. The field names and the relations between fields follow the real API, as described in the field guide.
 
 ```ts
 import { createSampleClient, SAMPLE_NICKNAME } from 'eternal-return-api/testing'

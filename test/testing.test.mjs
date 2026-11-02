@@ -46,7 +46,7 @@ test('sample client: anything else is not found, like the real API', async () =>
   assert.deepEqual(await res.json(), { code: 404, message: 'Not Found' })
 })
 
-test('sample data has only replaced nicknames', async () => {
+test('sample data uses only made-up names and ids', async () => {
   const er = createSampleClient()
   const seasons = await er.getSeasons()
   const top = await er.getTopRanks(seasons.currentRankedSeasonId)

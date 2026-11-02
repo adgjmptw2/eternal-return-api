@@ -1,10 +1,11 @@
 """Sample responses for building and testing without an API key.
 
-Built from real responses: two ranked games with every player, the
-leaderboard, the season, tactical skill, character mastery and item tables,
-and the localization keys those games need (Korean and English). Nicknames
-and game IDs are replaced, and RP and times are shifted, so rows do not point
-back at real players. The sample player is ``Player1``.
+Made-up responses in the shape of the real API: two ranked games with every
+player, the leaderboard, the season, tactical skill, character mastery and
+item tables, and the localization keys those games need (Korean and English).
+Nothing comes from the API: names, codes and numbers are invented. Field
+names and the relations between fields follow the real API. The sample player
+is ``Player1``.
 
     from eternal_return_api.testing import SAMPLE_NICKNAME, sample_client
 
