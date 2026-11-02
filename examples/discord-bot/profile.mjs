@@ -59,3 +59,22 @@ export function profileText({ user, season, rank, games, summary, names }) {
   }
   return { title: user.nickname, lines }
 }
+
+const NO_NAMES = { character: () => null, weapon: () => null }
+
+/** One finished game, for the /er-watch posts. `names` may be null. */
+export function gameText(g, names) {
+  names ??= NO_NAMES
+  const mode = gameModeName(g.matchingMode)
+  const parts = [
+    MODE_LABEL[mode],
+    `${names.character(g.characterNum) ?? g.characterNum}(${names.weapon(g.bestWeapon) ?? '?'})`,
+    `${g.gameRank}위`,
+    `${g.playerKill}킬 ${g.playerAssistant}어시`,
+  ]
+  if (typeof g.damageToPlayer === 'number') parts.push(`딜량 ${g.damageToPlayer.toLocaleString()}`)
+  if (mode === 'rank' && typeof g.mmrGain === 'number') {
+    parts.push(`RP ${g.mmrGain >= 0 ? '+' : ''}${g.mmrGain} → ${g.mmrAfter?.toLocaleString() ?? '?'}`)
+  }
+  return parts.join(' · ')
+}

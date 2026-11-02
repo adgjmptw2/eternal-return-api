@@ -4,7 +4,8 @@
  */
 
 export { ErClient, DEFAULT_BASE_URL } from './client.js'
-export type { ErClientOptions, UserGamesOptions } from './client.js'
+export type { ErClientOptions, SyncOptions, SyncResult, UserGamesOptions, WatchEvent, WatchOptions } from './client.js'
+export { isGameFinished } from './games.js'
 export { ErApiError, ErNicknameMismatchError } from './errors.js'
 export { MatchingMode, TeamMode, gameModeName } from './modes.js'
 export type { GameModeName } from './modes.js'

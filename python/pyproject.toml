@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eternal-return-api"
+version = "0.1.0"
+description = "Unofficial Python client for the Eternal Return Open API, from ERCraft: incremental sync, game watching, teams, tiers and names."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "김정현" }]
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.23,<1"]
+keywords = ["eternal-return", "bser", "open-api", "game-api", "sdk", "discord-bot"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: AsyncIO",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Games/Entertainment",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/adgjmptw2/eternal-return-api/tree/main/python"
+Repository = "https://github.com/adgjmptw2/eternal-return-api"
+Issues = "https://github.com/adgjmptw2/eternal-return-api/issues"
+"Field guide" = "https://github.com/adgjmptw2/eternal-return-api/blob/main/GUIDE.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eternal_return_api"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "README.ko.md", "LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+python_version = "3.10"
+files = ["src"]

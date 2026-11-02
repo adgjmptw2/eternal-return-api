@@ -1,0 +1,30 @@
+name: Python
+
+on:
+  push:
+    branches: [main]
+    paths: ['python/**', '.github/workflows/python.yml']
+  pull_request:
+    paths: ['python/**', '.github/workflows/python.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e . pytest==8.3.4 mypy==1.14.1
+      - run: pytest -q
+      - run: mypy

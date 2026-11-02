@@ -11,6 +11,7 @@ The code comes from [ERCraft](https://ercraft.net), an Eternal Return stats site
 - No runtime dependencies. Uses built-in `fetch`; Node 18+ (CI tests Node 18, 20, 22 and 24).
 - ESM only: `import`, not `require`.
 - Full TypeScript types for common responses. Unknown fields are preserved.
+- Python: [`pip install eternal-return-api`](python/README.md), with the same sync, watching, teams, tiers and names.
 
 ## Install
 
@@ -65,14 +66,59 @@ const teams = groupTeams(await er.getGame(12345678))
 
 Get an API key at [developer.eternalreturn.io](https://developer.eternalreturn.io). Keep it on your server. Never expose it to the browser.
 
+## Keeping up with new games
+
+Stats sites and bots fetch the same players again and again, so paging through the whole list each time wastes requests. ERCraft's first search once took 5.3 seconds because it paged down from the newest game to find games it already had. Jumping there with the `next` cursor cut the search to 1.75 seconds.
+
+```ts
+import { isGameFinished } from 'eternal-return-api'
+
+// Only games newer than the newest one you have. One request when there are a few.
+const { games, newestGameId } = await er.syncUserGames(uid, { after: saved })
+await db.saveGames(games)
+await db.saveNewest(uid, newestGameId)
+
+// A game fetched while other teams are still playing has no winner yet.
+// Store it for good only when it is finished; fetch it again later.
+const players = await er.getGame(games[0].gameId)
+if (isGameFinished(players)) await db.saveGame(players)
+```
+
+- A player's games are sorted by `gameId`, newest first, and the API's `next` cursor is a game id. `after` stops at a game you have; `before` starts below a given game in one request.
+- With `maxPages`, `syncUserGames` may stop before reaching `after`. It then returns `rest`: pass it back until no `rest` is returned. Until then `newestGameId` stays at the old `after`, so saving it never skips games.
+- `getGame` does not cache a game that is not finished.
+
+ERCraft once stored games fetched mid-game as final, and team records showed teammates as missing. A finished game has a row with `gameRank` 1. Row count alone is not enough: finished games can have fewer than 24 rows.
+
+### Watching players
+
+`watchGames` reports games as players finish them, oldest first. A Discord bot can post results from it.
+
+```ts
+const watched = new Set([uid])
+for await (const event of er.watchGames({ uids: () => watched, intervalMs: 60_000, signal })) {
+  if (event.type === 'game') console.log(event.uid, event.game.gameRank, event.game.playerKill)
+  else console.error(event.uid, event.error)
+}
+```
+
+- The first round only notes each player's newest game; past games are not reported. To resume after a restart, pass `after: { [uid]: gameId }` with the last game you handled. `after` is read when a player first appears, so a bot can set an entry before adding a player.
+- Each player's games come oldest first, and nothing is skipped no matter how many games a player played since the last round.
+- An array or a Set passed as `uids` is read again every round, so adding to it works. A function is called every round.
+- Each round costs one request per player when nothing is new, and skips the cache. At the default 1 request per second, 60 players take a minute per round.
+- A failed request for one player comes as an `error` event. Watching continues, and the next round tries again.
+- `event.game` is the player's own row. Other teams may still be playing, so check `isGameFinished` before storing `getGame` results.
+
 ## API
 
 | Method | Endpoint | Returns when not found |
 |---|---|---|
 | `getUserByNickname(nickname)` | `/v1/user/nickname` | `null` |
-| `getUserGames(uid, next?)` | `/v1/user/games/uid/{uid}` | `{ games: [] }` |
-| `iterateUserGames(uid, { since?, maxPages? })` | same, all pages | ends |
-| `getGame(gameId)` | `/v1/games/{gameId}` | `[]` |
+| `getUserGames(uid, next?, { fresh? })` | `/v1/user/games/uid/{uid}` | `{ games: [] }` |
+| `iterateUserGames(uid, { after?, before?, since?, maxPages? })` | same, all pages | ends |
+| `syncUserGames(uid, { after?, before?, since?, maxPages? })` | same, until `after` | `{ games: [] }` |
+| `watchGames({ uids, intervalMs?, after?, signal? })` | same, every round | keeps watching |
+| `getGame(gameId)` | `/v1/games/{gameId}`, cached only when finished | `[]` |
 | `getUserRank(uid, seasonId, teamMode?)` | `/v1/rank/uid/{uid}/{seasonId}/{teamMode}` | `null` |
 | `getTopRanks(seasonId, teamMode?)` | `/v1/rank/top/{seasonId}/{teamMode}` | `[]` |
 | `getUserStats(uid, seasonId, matchingMode?)` | `/v2/user/stats/uid/{uid}/{seasonId}/{mode}` | `[]` |
@@ -160,7 +206,7 @@ Requests not in the sample get the real API's not-found answer: HTTP 200 with `c
 
 ## Discord bot example
 
-[examples/discord-bot](https://github.com/adgjmptw2/eternal-return-api/tree/main/examples/discord-bot) is a bot with one command, `/er nickname`. It shows current ranked RP, a recent games summary, most played characters and the last five games.
+[examples/discord-bot](https://github.com/adgjmptw2/eternal-return-api/tree/main/examples/discord-bot) has two commands. `/er nickname` shows current ranked RP, a recent games summary, most played characters and the last five games. `/er-watch nickname` posts the player's results in the channel as they finish games, using `watchGames`.
 
 ## MCP server
 
@@ -196,7 +242,8 @@ Things we ran into in production. The [field guide](GUIDE.md) has more: teams, R
 - **Look players up by uid.** Lookup by `userNum` is retired.
 - **`/v1/user/games` returns only that player's row.** To see all participants, call `/v1/games/{gameId}`.
 - **Game history is short.** Only about 90 days are kept. Each page has about 10 games, which is undocumented. Store what you need.
-- **`next` is a game id.** Pass it back to get older games.
+- **`next` is a game id.** Pass it back to get older games. The next page starts below it, so `next=<gameId + 1>` starts at that game.
+- **A game fetched mid-game is incomplete.** It has only the players who are done, and no winner.
 - **Season ids are not season numbers.** The `Season` table names rows `Season20`, which players call Season 11. From `Season10` on, subtract 9. `toPlayerSeason()` does this.
 - **The current season can be a pre-season.** Between seasons, `isCurrent` points at a `Pre-Season` row, which has no ranked ladder. `currentRankedSeasonId` falls back to the last ranked season.
 - **Cobalt Protocol has two mode codes.** New games use `matchingMode` 6; older records use 4.
@@ -206,7 +253,7 @@ Things we ran into in production. The [field guide](GUIDE.md) has more: teams, R
 ## Not included
 
 - Retrying network errors other than 429. Decide that per use case.
-- Caching user data. Store games yourself; they expire.
+- Storing games. Games expire, so keep them in your own database; `syncUserGames` tells you what is new.
 - Replay files.
 
 ## License

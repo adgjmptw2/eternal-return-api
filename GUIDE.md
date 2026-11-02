@@ -36,6 +36,8 @@ The `Season` table and the game use different numbers.
 ## Game records
 
 - `/v1/user/games/uid/{uid}` returns only that player's row for each game, about 10 games per page. Pass `next` (a game id) to get older games.
+- A player's games come sorted by `gameId`, newest first. `next` is the id of the page's last game, and the next page starts below it. Any game id works: `next=<gameId + 1>` starts the page at that game, so you can jump to a point in the list in one request. A `next` larger than the newest game id returns the first page. Checked live in November 2026.
+- `/v1/games/{gameId}` fetched while other teams are still playing has only the players who are done, and no row with `gameRank` 1. ERCraft stored such games as final, and team records showed teammates as missing until it fetched them again. Checked live on November 2, 2026: a normal game fetched 14 minutes after it started had 6 rows, all ranked 6th or 7th. Eight minutes later it had 15 rows and still no winner. A game with a rank 1 row is finished; the row count does not tell you, since finished games can have fewer than 24 rows.
 - `/v1/games/{gameId}` returns every player in the game.
 - Games are kept for about 90 days; older games stop coming back. Each row's `expireDtm` is `startDtm` + `duration` + 90 days, within 3 seconds on all 594 rows.
 - `startDtm` and `expireDtm` are Korea time, `+0900`. Their milliseconds repeat the seconds (`15:30:59.059`) on every row checked, so do not read them as milliseconds.

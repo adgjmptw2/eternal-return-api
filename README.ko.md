@@ -11,6 +11,7 @@
 - 런타임 의존성 없음. 내장 `fetch` 사용, Node 18 이상(CI에서 Node 18, 20, 22, 24 테스트).
 - ESM 전용: `require`가 아니라 `import`로 씁니다.
 - 자주 쓰는 응답은 타입이 있고, 모르는 필드도 그대로 남습니다.
+- Python 버전: [`pip install eternal-return-api`](python/README.ko.md). 새 경기만 받기, 감시, 팀, 티어, 이름 찾기가 똑같이 들어 있습니다.
 
 ## 설치
 
@@ -64,6 +65,49 @@ const teams = groupTeams(await er.getGame(12345678))
 `summarizeGames`는 넣은 경기를 모드 구분 없이 합칩니다. 한 모드만 보려면 `matchingMode`로 먼저 거르세요.
 
 API 키는 [developer.eternalreturn.io](https://developer.eternalreturn.io)에서 받습니다. 키는 서버에만 두고 브라우저 코드에 넣지 마세요.
+
+## 새 경기만 받기
+
+전적 사이트나 봇은 같은 플레이어를 계속 다시 조회합니다. 매번 목록을 처음부터 넘기면 요청이 낭비됩니다. ERCraft는 첫 검색에 5.3초가 걸린 적이 있는데, 이미 저장한 경기를 찾으려고 최신 경기부터 페이지를 넘겼기 때문입니다. `next` 커서로 그 위치로 바로 건너뛰게 바꿔 1.75초로 줄였습니다.
+
+```ts
+import { isGameFinished } from 'eternal-return-api'
+
+// 가진 경기 중 가장 최신 것보다 새 경기만. 몇 판이면 요청 1번.
+const { games, newestGameId } = await er.syncUserGames(uid, { after: saved })
+await db.saveGames(games)
+await db.saveNewest(uid, newestGameId)
+
+// 다른 팀이 아직 게임 중일 때 받은 경기에는 1등이 없습니다.
+// 끝난 경기만 확정 저장하고, 나머지는 나중에 다시 받으세요.
+const players = await er.getGame(games[0].gameId)
+if (isGameFinished(players)) await db.saveGame(players)
+```
+
+- 플레이어의 경기 목록은 `gameId` 내림차순이고, API의 `next` 커서가 경기 ID입니다. `after`는 가진 경기에서 멈추고, `before`는 지정한 경기 바로 아래부터 요청 1번에 시작합니다.
+- `maxPages`를 주면 `syncUserGames`가 `after`에 닿기 전에 멈출 수 있습니다. 이때 `rest`가 같이 오니 `rest`가 더 안 올 때까지 그대로 다시 넘기세요. 그 전까지 `newestGameId`는 예전 `after` 그대로라서, 저장해도 경기를 건너뛰지 않습니다.
+- `getGame`은 끝나지 않은 경기를 캐시하지 않습니다.
+
+ERCraft는 경기 도중에 받은 기록을 완성본으로 저장해서, 팀원 기록이 없다고 나온 적이 있습니다. 끝난 경기에는 `gameRank`가 1인 행이 있습니다. 끝난 경기도 24행보다 적을 수 있어서 행 수만으로는 판단할 수 없습니다.
+
+### 새 경기 알림
+
+`watchGames`는 플레이어가 경기를 끝내면 오래된 순서로 알려 줍니다. 디스코드 봇에서 결과를 올릴 때 쓸 수 있습니다.
+
+```ts
+const watched = new Set([uid])
+for await (const event of er.watchGames({ uids: () => watched, intervalMs: 60_000, signal })) {
+  if (event.type === 'game') console.log(event.uid, event.game.gameRank, event.game.playerKill)
+  else console.error(event.uid, event.error)
+}
+```
+
+- 첫 바퀴는 플레이어마다 최신 경기만 기억하고, 지난 경기는 알리지 않습니다. 재시작 후 이어서 보려면 마지막으로 처리한 경기를 `after: { [uid]: gameId }`로 넘기세요. `after`는 플레이어가 처음 나타날 때 읽으니, 봇에서 플레이어를 추가하기 전에 값을 넣어 두면 됩니다.
+- 플레이어마다 오래된 경기부터 오고, 지난 바퀴 이후 몇 판을 했든 빠뜨리지 않습니다.
+- `uids`에 배열이나 Set을 넣으면 매 바퀴 다시 읽으니, 나중에 추가해도 반영됩니다. 함수를 넣으면 매 바퀴 호출합니다.
+- 새 경기가 없으면 한 바퀴에 플레이어당 요청 1번이고, 캐시를 쓰지 않습니다. 기본값인 초당 1회면 60명 한 바퀴에 1분이 걸립니다.
+- 한 플레이어의 요청이 실패하면 `error` 이벤트가 옵니다. 감시는 계속되고 다음 바퀴에 다시 시도합니다.
+- `event.game`은 그 플레이어 본인의 행입니다. 다른 팀은 아직 게임 중일 수 있으니, `getGame` 결과를 저장하기 전에 `isGameFinished`로 확인하세요.
 
 ## 캐시
 
@@ -127,7 +171,7 @@ const user = await er.getUserByNickname(SAMPLE_NICKNAME)
 
 ## 디스코드 봇 예제
 
-[examples/discord-bot](https://github.com/adgjmptw2/eternal-return-api/tree/main/examples/discord-bot)은 `/er 닉네임` 명령 하나짜리 봇입니다. 현재 랭크 RP, 최근 경기 요약, 많이 한 실험체, 최근 5경기를 보여 줍니다.
+[examples/discord-bot](https://github.com/adgjmptw2/eternal-return-api/tree/main/examples/discord-bot)에는 명령이 두 개 있습니다. `/er 닉네임`은 현재 랭크 RP, 최근 경기 요약, 많이 한 실험체, 최근 5경기를 보여 주고, `/er-watch 닉네임`은 `watchGames`로 그 플레이어가 경기를 끝낼 때마다 채널에 결과를 올립니다.
 
 ## MCP 서버
 
@@ -163,7 +207,8 @@ const user = await er.getUserByNickname(SAMPLE_NICKNAME)
 - **플레이어는 uid로 찾습니다.** `userNum` 조회는 없어졌습니다.
 - **`/v1/user/games`에는 그 플레이어 한 명의 기록만 있습니다.** 한 경기의 참가자 전원은 경기마다 `/v1/games/{gameId}`로 받아야 합니다.
 - **경기 기록은 오래 남지 않습니다.** 약 90일만 남습니다. 한 페이지에 약 10경기씩 오는데, 문서에는 없는 내용입니다. 필요한 건 직접 저장하세요.
-- **`next`는 경기 ID입니다.** 다음 요청에 그대로 넘기면 더 오래된 경기를 받습니다.
+- **`next`는 경기 ID입니다.** 다음 요청에 그대로 넘기면 더 오래된 경기를 받습니다. 다음 페이지는 그 경기 바로 아래부터라서, `next=<gameId + 1>`이면 그 경기부터 옵니다.
+- **경기 도중 받은 기록은 완성본이 아닙니다.** 끝난 플레이어만 있고 1등이 없습니다.
 - **시즌 ID와 시즌 번호가 다릅니다.** `Season` 표의 `Season20`이 게임 안의 시즌 11입니다. `Season10`부터는 9를 빼면 됩니다. `toPlayerSeason()`으로 바꿀 수 있습니다.
 - **현재 시즌이 프리시즌일 수 있습니다.** 시즌 사이에는 `isCurrent`가 랭크가 없는 `Pre-Season` 행을 가리킵니다. `currentRankedSeasonId`는 이때 직전 랭크 시즌을 돌려줍니다.
 - **코발트 프로토콜 모드 코드는 두 개입니다.** 지금 경기는 `matchingMode` 6, 예전 기록은 4입니다.
@@ -173,7 +218,7 @@ const user = await er.getUserByNickname(SAMPLE_NICKNAME)
 ## 넣지 않은 것
 
 - 429 말고 다른 네트워크 오류 재시도. 쓰는 곳에 맞게 직접 정하세요.
-- 사용자 데이터 캐시. 경기 기록은 사라지니 직접 저장하세요.
+- 경기 저장. 경기 기록은 사라지니 직접 DB에 저장하세요. 무엇이 새 경기인지는 `syncUserGames`가 알려 줍니다.
 - 리플레이 파일.
 
 ## 라이선스
