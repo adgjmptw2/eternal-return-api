@@ -20,19 +20,20 @@ const commands = [
     .addStringOption((o) => o.setName('nickname').setDescription('닉네임').setRequired(true)),
 ]
 
-// uid -> { nickname, channels: Map(channelId -> newest gameId when turned on) }.
-// In memory: a restart forgets it.
+// nickname -> { uid, nickname, channels: Map(channelId -> newest gameId when turned on) }.
+// Keyed by nickname: every lookup gives a player a different uid. In memory: a restart forgets it.
 const watched = new Map()
+const keyOf = (nickname) => nickname.normalize('NFKC').toLowerCase()
 // uid -> newest game when the first channel turned it on, read by watchGames.
 const startAfter = new Map()
 
 // Runs toggles for one player one at a time, so two channels cannot overwrite each other.
 const toggling = new Map()
-function oneAtATime(uid, task) {
-  const run = (toggling.get(uid) ?? Promise.resolve()).then(task, task)
+function oneAtATime(key, task) {
+  const run = (toggling.get(key) ?? Promise.resolve()).then(task, task)
   const tail = run.catch(() => {})
-  toggling.set(uid, tail)
-  tail.then(() => toggling.get(uid) === tail && toggling.delete(uid))
+  toggling.set(key, tail)
+  tail.then(() => toggling.get(key) === tail && toggling.delete(key))
   return run
 }
 
@@ -45,12 +46,13 @@ client.once(Events.ClientReady, async (c) => {
 })
 
 async function postResults(c) {
-  for await (const event of er.watchGames({ uids: () => watched.keys(), after: startAfter, intervalMs: 60_000 })) {
+  const uids = () => [...watched.values()].map((entry) => entry.uid)
+  for await (const event of er.watchGames({ uids, after: startAfter, intervalMs: 60_000 })) {
     if (event.type === 'error') {
       console.error('watch', event.uid, event.error)
       continue
     }
-    const entry = watched.get(event.uid)
+    const entry = [...watched.values()].find((e) => e.uid === event.uid)
     if (!entry) continue
     // Loaded once and kept; if it fails, the post shows codes and the next one tries again.
     const names = await er.getNames('Korean').catch(() => null)
@@ -82,12 +84,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.editReply(`'${nickname}' 플레이어를 찾지 못했습니다.`)
         return
       }
-      const turnedOn = await oneAtATime(user.uid, async () => {
-        const entry = watched.get(user.uid)
+      const key = keyOf(user.nickname)
+      const turnedOn = await oneAtATime(key, async () => {
+        const entry = watched.get(key)
         if (entry?.channels.delete(interaction.channelId)) {
           if (entry.channels.size === 0) {
-            watched.delete(user.uid)
-            startAfter.delete(user.uid)
+            watched.delete(key)
+            startAfter.delete(entry.uid)
           }
           return false
         }
@@ -97,7 +100,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (entry) entry.channels.set(interaction.channelId, newest)
         else {
           startAfter.set(user.uid, newest)
-          watched.set(user.uid, { nickname: user.nickname, channels: new Map([[interaction.channelId, newest]]) })
+          watched.set(key, { uid: user.uid, nickname: user.nickname, channels: new Map([[interaction.channelId, newest]]) })
         }
         return true
       })

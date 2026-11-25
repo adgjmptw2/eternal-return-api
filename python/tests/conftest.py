@@ -19,6 +19,11 @@ def row(game_id: int, **extra: Any) -> dict[str, Any]:
     return {"gameId": game_id, "gameRank": 3, "startDtm": text, **extra}
 
 
+def live_row(game_id: int, **extra: Any) -> dict[str, Any]:
+    """A row of a game that started just now."""
+    return row(game_id, startDtm=datetime.now(KST).strftime("%Y-%m-%dT%H:%M:%S.000%z"), **extra)
+
+
 @dataclass
 class FakeApi:
     """One or more players' game lists, served like the real API: newest

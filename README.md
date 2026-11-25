@@ -22,7 +22,7 @@ npm install eternal-return-api
 ## Use
 
 ```ts
-import { ErClient, MatchingMode, groupTeams, rankTier, summarizeGames } from 'eternal-return-api'
+import { ErClient, MatchingMode, groupTeams, rankTier, rpChange, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -32,7 +32,7 @@ if (!user) throw new Error('No such player')
 const seasons = await er.getSeasons()
 const seasonId = seasons.currentRankedSeasonId!
 
-const rank = await er.getUserRank(user.uid, seasonId)
+const rank = await er.getUserRank(user.uid, seasonId) // null without a ranked game this season
 const stats = await er.getUserStats(user.uid, seasonId, MatchingMode.RANKED)
 
 // Names from the official localization file
@@ -44,9 +44,9 @@ console.log(tier.name, names.tier(tier.tier)) // "Diamond 2" "Diamond"
 
 // Recent games, newest first, across pages
 const games = []
-for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-10-01') })) {
+for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-11-19') })) {
   games.push(game)
-  console.log(names.character(game.characterNum), names.weapon(game.bestWeapon), game.gameRank)
+  console.log(names.character(game.characterNum), names.weapon(game.bestWeapon), game.gameRank, rpChange(game)?.change)
 }
 
 // Win rate, average rank and kills, overall and per character
@@ -60,9 +60,13 @@ const teams = groupTeams(await er.getGame(12345678))
 
 `rankTier` turns RP into a tier and division, using the same season tables as ERCraft. Titan and Immortal (keys `demigod` and `eternity`) depend on leaderboard rank, so pass `rank`. Without it, the highest result is Mythril. Seasons newer than the package use the latest table. `names.tier` returns just the tier name in the chosen language, without the division.
 
-`groupTeams` sorts teams by placement and adds team kills, assists and damage.
+`rpChange` gives the RP before and after a ranked game. `mmrGain` and `mmrAfter` alone are wrong for players who left.
 
-`summarizeGames` combines all modes passed in. Filter by `matchingMode` first if you need one mode.
+`groupTeams` sorts teams by placement and adds team kills, assists and damage. `bots` counts AI players in the team.
+
+`summarizeGames` combines all modes passed in, without AI players. Filter by `matchingMode` first if you need one mode.
+
+The `uid` is for requests only. Each nickname lookup returns a different one, so do not use it as a key in your own data.
 
 Get an API key at [developer.eternalreturn.io](https://developer.eternalreturn.io). Keep it on your server. Never expose it to the browser.
 
@@ -76,7 +80,7 @@ import { isGameFinished } from 'eternal-return-api'
 // Only games newer than the newest one you have. One request when there are a few.
 const { games, newestGameId } = await er.syncUserGames(uid, { after: saved })
 await db.saveGames(games)
-await db.saveNewest(uid, newestGameId)
+await db.saveNewest(player.id, newestGameId) // your own id, not the uid
 
 // A game fetched while other teams are still playing has no winner yet.
 // Store it for good only when it is finished; fetch it again later.
@@ -88,7 +92,7 @@ if (isGameFinished(players)) await db.saveGame(players)
 - With `maxPages`, `syncUserGames` may stop before reaching `after`. It then returns `rest`: pass it back until no `rest` is returned. Until then `newestGameId` stays at the old `after`, so saving it never skips games.
 - `getGame` does not cache a game that is not finished.
 
-ERCraft once stored games fetched mid-game as final, and team records showed teammates as missing. A finished game has a row with `gameRank` 1. Row count alone is not enough: finished games can have fewer than 24 rows.
+ERCraft once stored games fetched mid-game as final, and team records showed teammates as missing. `isGameFinished` looks for a row with `gameRank` 1, or for a start more than an hour ago: a game an AI team won can have no such row. Row count alone is not enough: finished games can have fewer than 24 rows.
 
 ### Watching players
 
@@ -102,7 +106,7 @@ for await (const event of er.watchGames({ uids: () => watched, intervalMs: 60_00
 }
 ```
 
-- The first round only notes each player's newest game; past games are not reported. To resume after a restart, pass `after: { [uid]: gameId }` with the last game you handled. `after` is read when a player first appears, so a bot can set an entry before adding a player.
+- The first round only notes each player's newest game; past games are not reported. To resume after a restart, pass `after: { [uid]: gameId }` with the last game you handled, under the uid you watch with. `after` is read when a player first appears, so a bot can set an entry before adding a player.
 - Each player's games come oldest first, and nothing is skipped no matter how many games a player played since the last round.
 - An array or a Set passed as `uids` is read again every round, so adding to it works. A function is called every round.
 - Each round costs one request per player when nothing is new, and skips the cache. At the default 1 request per second, 60 players take a minute per round.
@@ -120,7 +124,7 @@ for await (const event of er.watchGames({ uids: () => watched, intervalMs: 60_00
 | `watchGames({ uids, intervalMs?, after?, signal? })` | same, every round | keeps watching |
 | `getGame(gameId)` | `/v1/games/{gameId}`, cached only when finished | `[]` |
 | `getUserRank(uid, seasonId, teamMode?)` | `/v1/rank/uid/{uid}/{seasonId}/{teamMode}` | `null` |
-| `getTopRanks(seasonId, teamMode?)` | `/v1/rank/top/{seasonId}/{teamMode}` | `[]` |
+| `getTopRanks(seasonId, teamMode?, serverCode?)` | `/v1/rank/top/{seasonId}/{teamMode}` | `[]` |
 | `getUserStats(uid, seasonId, matchingMode?)` | `/v2/user/stats/uid/{uid}/{seasonId}/{mode}` | `[]` |
 | `getData(metaType)` | `/v2/data/{metaType}` | throws |
 | `getSeasons()` | `/v2/data/Season`, cached | throws |
@@ -226,8 +230,8 @@ The package includes an [MCP](https://modelcontextprotocol.io) server, so AI ass
 
 | Tool | Input | Returns |
 |---|---|---|
-| `player_profile` | `nickname`, `games` (1-50, default 20) | ranked tier and RP, recent games summary (Cobalt Protocol excluded), most played characters, recent games with names |
-| `game_detail` | `gameId` | everyone in the game, by team |
+| `player_profile` | `nickname`, `games` (1-50, default 20) | ranked tier and RP, summary of recent normal and ranked games, most played characters, recent games with names |
+| `game_detail` | `gameId` | everyone in the game, by team, AI players marked |
 | `top_ranks` | `limit` (1-100, default 20) | top players of the current ranked season |
 
 Names are in Korean by default. Set `ER_LANGUAGE` (for example `English`) to change it.
@@ -240,6 +244,9 @@ Things we ran into in production. The [field guide](GUIDE.md) has more: teams, R
 - **Nickname lookup returns `userId`, not `uid`.** The API returns `userId`, but the docs show `uid`. The client accepts both and always gives you `uid`.
 - **The returned nickname is checked.** The client compares it with the one you asked for, ignoring case and full-width/half-width differences, and throws `ErNicknameMismatchError` if they differ.
 - **Look players up by uid.** Lookup by `userNum` is retired.
+- **The uid is not an ID.** Each nickname lookup returns a different one. Older ones keep working for some time. Use it for requests, not as a key.
+- **Rank 0 is not a rank.** Players without a ranked game this season still get RP from the API: the RP they would start from. `getUserRank` returns null for them.
+- **AI players have rows.** Normal games and lower ranked games can include them. `isBotPlayer` tells them apart.
 - **`/v1/user/games` returns only that player's row.** To see all participants, call `/v1/games/{gameId}`.
 - **Game history is short.** Only about 90 days are kept. Each page has about 10 games, which is undocumented. Store what you need.
 - **`next` is a game id.** Pass it back to get older games. The next page starts below it, so `next=<gameId + 1>` starts at that game.
@@ -248,7 +255,7 @@ Things we ran into in production. The [field guide](GUIDE.md) has more: teams, R
 - **The current season can be a pre-season.** Between seasons, `isCurrent` points at a `Pre-Season` row, which has no ranked ladder. `currentRankedSeasonId` falls back to the last ranked season.
 - **Cobalt Protocol has two mode codes.** New games use `matchingMode` 6; older records use 4.
 - **Localization is a file, not JSON.** `/v1/l10n/{language}` returns a URL to a text file with `key┃value` lines.
-- **Top ranks are not paginated.** One response is all you get (1,001 players in Oct 2026). It has nicknames, not uids.
+- **Top ranks are not paginated.** One response is all you get (1,001 players in Nov 2026). It has nicknames, not uids.
 
 ## Not included
 

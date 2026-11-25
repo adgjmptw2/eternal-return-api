@@ -142,9 +142,30 @@ test('syncUserGames gives rest whenever maxPages stops it', async () => {
 })
 
 test('isGameFinished looks for the winner, not the row count', () => {
-  assert.equal(isGameFinished([]), false)
-  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 2 })]), false)
-  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 1 })]), true)
+  const start = Date.parse(row(1).startDtm)
+  assert.equal(isGameFinished([], start), false)
+  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 2 })], start), false)
+  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 1 })], start), true)
+})
+
+test('isGameFinished: an hour after the start a game without a winner row is over', () => {
+  // Live: a beginner game against AI players without rows. The one player placed 4th and no row has rank 1.
+  const players = [row(1, { gameRank: 4, startDtm: '2026-11-20T21:15:08.008+0900', botAdded: 23, matchSize: 1 })]
+  const start = Date.UTC(2026, 10, 20, 12, 15, 8, 8)
+  assert.equal(isGameFinished(players, start + 59 * 60_000), false)
+  assert.equal(isGameFinished(players, start + 60 * 60_000), false)
+  assert.equal(isGameFinished(players, start + 60 * 60_000 + 1), true)
+  // A row without a readable time does not count as old, and the next row decides.
+  assert.equal(isGameFinished([row(1, { gameRank: 4, startDtm: undefined })], start + 1e10), false)
+  assert.equal(isGameFinished([row(1, { gameRank: 4, startDtm: 'x' }), ...players], start + 1e10), true)
+})
+
+test('getGame caches a game without a winner row once it must be over', async () => {
+  const { state, fetch } = server({ games: { 7: () => [row(7, { gameRank: 4 })] } })
+  const er = client(fetch, { cache: new MemoryCache(), now: () => Date.parse(row(7).startDtm) + 3 * 3600_000 })
+  await er.getGame(7)
+  await er.getGame(7)
+  assert.equal(state.calls.length, 1)
 })
 
 test('getGame does not cache a game still being played', async () => {

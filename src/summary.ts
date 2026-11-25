@@ -1,3 +1,4 @@
+import { isBotPlayer } from './games.js'
 import type { UserGame } from './types.js'
 
 export interface GameSummary {
@@ -73,13 +74,15 @@ class Totals {
 /**
  * Totals and per-character stats for a list of games.
  *
- * Mixing modes skews the numbers (Cobalt Protocol ranks teams differently), so
- * filter by `matchingMode` first when that matters.
+ * AI players (`isBotPlayer`) are skipped. Mixing modes skews the numbers
+ * (Cobalt Protocol has 2 teams, Rumble Out 5), so filter by `matchingMode`
+ * first when that matters.
  */
 export function summarizeGames(games: Iterable<UserGame>): GamesSummary {
   const overall = new Totals()
   const byCharacter = new Map<number, Totals>()
   for (const game of games) {
+    if (isBotPlayer(game)) continue
     overall.add(game)
     let totals = byCharacter.get(game.characterNum)
     if (!totals) {

@@ -120,6 +120,22 @@ test('groupTeams groups by team, best placement first', () => {
   assert.equal(teams[1].damageToPlayer, 200)
 })
 
+test('groupTeams: an AI team can win', () => {
+  // Live: when an AI team wins, the API sends victory 0 in every row.
+  const p = (teamNumber, gameRank, extra = {}) => ({ teamNumber, gameRank, victory: 0, playerKill: 1, playerAssistant: 0, ...extra })
+  const teams = groupTeams([
+    p(1, 7), p(8, 1, { isMLBot: true, mlbot: true }), p(8, 1, { isMLBot: true, mlbot: true }), p(8, 1, { isMLBot: true, mlbot: true }),
+  ])
+  assert.deepEqual(teams.map((t) => [t.teamNumber, t.gameRank, t.victory, t.bots]), [[8, 1, true, 3], [1, 7, false, 0]])
+})
+
+test('groupTeams: a winner who gave up does not change the team result', () => {
+  // Live: a player of the winning team who gave up has victory 0.
+  const p = (victory, giveUp, duration) => ({ teamNumber: 1, gameRank: 1, victory, giveUp, duration, playerKill: 1 })
+  const [team] = groupTeams([p(0, 1, 1200), p(1, 0, 1300), p(1, 0, 1300)])
+  assert.equal(team.victory, true)
+})
+
 test('groupTeams takes rank and team kills from the member who stayed longest', () => {
   // Live game: the player who gave up kept rank 5 and 14 team kills from when they left.
   const p = (gameRank, teamKill, duration, giveUp) =>

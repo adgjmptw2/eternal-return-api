@@ -5,10 +5,15 @@ import asyncio
 import pytest
 
 from eternal_return_api import (
+    LATEST_TIER_SEASON,
     GameNames,
+    RpChange,
     game_mode_name,
     group_teams,
+    is_bot_player,
+    is_game_finished,
     rank_tier,
+    rp_change,
     summarize_games,
 )
 from eternal_return_api.testing import (
@@ -73,7 +78,66 @@ def test_summarize_games() -> None:
 
 
 def test_game_mode_name() -> None:
-    assert [game_mode_name(m) for m in (2, 3, 4, 6, 9, 99)] == ["normal", "rank", "cobalt", "cobalt", "loneWolf", "unknown"]
+    assert [game_mode_name(m) for m in (2, 3, 4, 6, 9, 13, 99)] == [
+        "normal", "rank", "cobalt", "cobalt", "loneWolf", "rumbleOut", "unknown"
+    ]
+
+
+def test_season_13_tier_lines() -> None:
+    assert LATEST_TIER_SEASON == 13
+    for rp in (1, 600, 1400, 2400, 3600, 5000, 6400, 7300, 7599, 7600, 8300, 9000):
+        for rank in (None, 1, 301, 1001):
+            assert rank_tier(rp, rank=rank, season=13) == rank_tier(rp, rank=rank, season=12)
+    # RP where the entry cost changed in 13.0 and 13.1 ranked games.
+    for rp in (600, 800, 1000, 1200, 1400, 1650, 1900, 2150, 2400, 2700, 3000, 3300, 3600, 3950, 4300, 4650,
+               5000, 5350, 5700, 6050, 6400, 6700, 7000, 7300, 7600):
+        assert rank_tier(rp, season=13).min_rp == rp
+
+
+@pytest.mark.parametrize(
+    ("row", "after"),
+    [
+        ({"mmrBefore": 4200, "mmrGain": 17, "mmrAfter": 4217, "rankPoint": 4217}, 4217),
+        # Moved up a tier: rankPoint leaves out the 50.
+        ({"mmrBefore": 1380, "mmrGain": 130, "mmrAfter": 1510, "rankPoint": 1460}, 1510),
+        # Left and paid twice the entry cost.
+        ({"mmrBefore": 2800, "mmrGain": 0, "mmrAfter": 0, "rankPoint": 2740, "giveUp": 1}, 2740),
+        # 12.6: a doubled game.
+        ({"mmrBefore": 5400, "mmrGain": 212, "mmrGainGambit": 424, "mmrAfter": 5824, "rankPoint": 5824}, 5824),
+        # Gave up with the team at 0 entry cost.
+        ({"mmrBefore": 40, "mmrGain": 0, "mmrAfter": 40, "rankPoint": 40, "giveUp": 1}, 40),
+    ],
+)
+def test_rp_change(row: dict[str, int], after: int) -> None:
+    result = rp_change({"matchingMode": 3, **row})  # type: ignore[typeddict-item]
+    assert result == RpChange(row["mmrBefore"], after)
+    assert result.change == after - row["mmrBefore"]
+
+
+def test_rp_change_other_modes() -> None:
+    assert rp_change({"matchingMode": 2, "rankPoint": 0, "mmrGainGambit": 5}) is None
+    assert rp_change({"matchingMode": 3}) is None
+    assert rp_change({"matchingMode": 3, "mmrBefore": 100}) is None
+
+
+def test_ai_players() -> None:
+    bot = {"teamNumber": 8, "gameRank": 1, "victory": 0, "isMLBot": True, "mlbot": True, "characterNum": 5}
+    human = {"teamNumber": 1, "gameRank": 7, "victory": 0, "characterNum": 1, "playerKill": 3}
+    assert is_bot_player(bot) and not is_bot_player(human)  # type: ignore[arg-type]
+    teams = group_teams([human, bot, bot, bot])  # type: ignore[list-item]
+    assert [(t.team_number, t.victory, t.bots) for t in teams] == [(8, True, 3), (1, False, 0)]
+    s = summarize_games([human, bot])  # type: ignore[list-item]
+    assert s.overall.games == 1 and [c.character_num for c in s.characters] == [1]
+
+
+def test_game_without_a_winner_row_is_over_after_an_hour() -> None:
+    # A beginner game against AI players without rows: no row has rank 1.
+    players = [{"gameRank": 4, "startDtm": "2026-11-20T21:15:08.008+0900"}]
+    start = 1795176908.008
+    assert not is_game_finished(players, now=start + 3600)  # type: ignore[arg-type]
+    assert is_game_finished(players, now=start + 3601)  # type: ignore[arg-type]
+    assert not is_game_finished([{"gameRank": 4}], now=start * 2)
+    assert not is_game_finished([], now=start)
 
 
 def test_names_strip_tags_and_unknown_codes() -> None:
@@ -98,7 +162,8 @@ def test_sample_client_end_to_end() -> None:
         players = er.get_game(games[0]["gameId"])
         assert len(players) >= 18 and group_teams(players)[0].game_rank == 1
         seasons = er.get_seasons()
-        assert seasons.current_ranked_season_id == 41
+        assert seasons.current_ranked_season_id == 43
+        assert seasons.player_season_of(43) == 13
         for language in ("Korean", "English"):
             names = er.get_names(language)
             for p in players:
@@ -115,7 +180,7 @@ def test_async_sample_client() -> None:
         async with async_sample_client() as er:
             user = await er.get_user_by_nickname(SAMPLE_NICKNAME)
             assert user is not None
-            names, rank = await asyncio.gather(er.get_names("English"), er.get_user_rank(user["uid"], 41))
+            names, rank = await asyncio.gather(er.get_names("English"), er.get_user_rank(user["uid"], 43))
             assert rank is not None and rank_tier(rank["mmr"], rank=rank["rank"]).name
             page = await er.get_user_games(user["uid"])
             assert names.character(page.games[0]["characterNum"])

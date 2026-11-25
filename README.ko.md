@@ -22,7 +22,7 @@ npm install eternal-return-api
 ## 사용
 
 ```ts
-import { ErClient, MatchingMode, groupTeams, rankTier, summarizeGames } from 'eternal-return-api'
+import { ErClient, MatchingMode, groupTeams, rankTier, rpChange, summarizeGames } from 'eternal-return-api'
 
 const er = new ErClient({ apiKey: process.env.ER_API_KEY! })
 
@@ -32,7 +32,7 @@ if (!user) throw new Error('없는 플레이어')
 const seasons = await er.getSeasons()
 const seasonId = seasons.currentRankedSeasonId!
 
-const rank = await er.getUserRank(user.uid, seasonId)
+const rank = await er.getUserRank(user.uid, seasonId) // 이번 시즌 랭크를 안 했으면 null
 const stats = await er.getUserStats(user.uid, seasonId, MatchingMode.RANKED)
 
 // 공식 번역 파일의 이름
@@ -44,9 +44,9 @@ console.log(names.tier(tier.tier), tier.division) // "다이아몬드" 2
 
 // 최근 경기, 최신순, 페이지를 넘겨 가며
 const games = []
-for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-10-01') })) {
+for await (const game of er.iterateUserGames(user.uid, { since: new Date('2026-11-19') })) {
   games.push(game)
-  console.log(names.character(game.characterNum), names.weapon(game.bestWeapon), game.gameRank)
+  console.log(names.character(game.characterNum), names.weapon(game.bestWeapon), game.gameRank, rpChange(game)?.change)
 }
 
 // 전체와 실험체별 승률, 평균 순위, 킬
@@ -60,9 +60,13 @@ const teams = groupTeams(await er.getGame(12345678))
 
 `rankTier`는 RP를 티어와 단계로 바꿉니다. 시즌별 구간은 ERCraft와 같은 표를 씁니다. 데미갓과 이터니티는 순위로 정해지니 `rank`를 넣어야 하고, 없으면 미스릴까지만 나옵니다. 패키지에 없는 새 시즌은 마지막 시즌 표를 씁니다. `names.tier`는 언어별 티어 이름만 돌려주니, 단계 숫자는 직접 붙이세요.
 
-`groupTeams`는 팀을 순위순으로 정렬하고 팀 킬, 어시스트, 딜량을 더해 줍니다.
+`rpChange`는 랭크 게임 전후 RP를 줍니다. 중간에 나간 플레이어는 `mmrGain`과 `mmrAfter`만 보면 틀립니다.
 
-`summarizeGames`는 넣은 경기를 모드 구분 없이 합칩니다. 한 모드만 보려면 `matchingMode`로 먼저 거르세요.
+`groupTeams`는 팀을 순위순으로 정렬하고 팀 킬, 어시스트, 딜량을 더해 줍니다. `bots`는 그 팀의 AI 플레이어 수입니다.
+
+`summarizeGames`는 넣은 경기를 AI 플레이어를 빼고 모드 구분 없이 합칩니다. 한 모드만 보려면 `matchingMode`로 먼저 거르세요.
+
+`uid`는 요청에만 쓰세요. 닉네임을 조회할 때마다 다른 값이 오므로 저장 키로 쓰면 안 됩니다.
 
 API 키는 [developer.eternalreturn.io](https://developer.eternalreturn.io)에서 받습니다. 키는 서버에만 두고 브라우저 코드에 넣지 마세요.
 
@@ -76,7 +80,7 @@ import { isGameFinished } from 'eternal-return-api'
 // 가진 경기 중 가장 최신 것보다 새 경기만. 몇 판이면 요청 1번.
 const { games, newestGameId } = await er.syncUserGames(uid, { after: saved })
 await db.saveGames(games)
-await db.saveNewest(uid, newestGameId)
+await db.saveNewest(player.id, newestGameId) // uid가 아니라 직접 정한 ID
 
 // 다른 팀이 아직 게임 중일 때 받은 경기에는 1등이 없습니다.
 // 끝난 경기만 확정 저장하고, 나머지는 나중에 다시 받으세요.
@@ -88,7 +92,7 @@ if (isGameFinished(players)) await db.saveGame(players)
 - `maxPages`를 주면 `syncUserGames`가 `after`에 닿기 전에 멈출 수 있습니다. 이때 `rest`가 같이 오니 `rest`가 더 안 올 때까지 그대로 다시 넘기세요. 그 전까지 `newestGameId`는 예전 `after` 그대로라서, 저장해도 경기를 건너뛰지 않습니다.
 - `getGame`은 끝나지 않은 경기를 캐시하지 않습니다.
 
-ERCraft는 경기 도중에 받은 기록을 완성본으로 저장해서, 팀원 기록이 없다고 나온 적이 있습니다. 끝난 경기에는 `gameRank`가 1인 행이 있습니다. 끝난 경기도 24행보다 적을 수 있어서 행 수만으로는 판단할 수 없습니다.
+ERCraft는 경기 도중에 받은 기록을 완성본으로 저장해서, 팀원 기록이 없다고 나온 적이 있습니다. `isGameFinished`는 `gameRank`가 1인 행이 있거나 시작한 지 1시간이 지났으면 끝난 경기로 봅니다. AI 팀이 이긴 경기에는 1등 행이 없을 수 있습니다. 끝난 경기도 24행보다 적을 수 있어서 행 수만으로는 판단할 수 없습니다.
 
 ### 새 경기 알림
 
@@ -102,7 +106,7 @@ for await (const event of er.watchGames({ uids: () => watched, intervalMs: 60_00
 }
 ```
 
-- 첫 바퀴는 플레이어마다 최신 경기만 기억하고, 지난 경기는 알리지 않습니다. 재시작 후 이어서 보려면 마지막으로 처리한 경기를 `after: { [uid]: gameId }`로 넘기세요. `after`는 플레이어가 처음 나타날 때 읽으니, 봇에서 플레이어를 추가하기 전에 값을 넣어 두면 됩니다.
+- 첫 바퀴는 플레이어마다 최신 경기만 기억하고, 지난 경기는 알리지 않습니다. 재시작 후 이어서 보려면 마지막으로 처리한 경기를 `after: { [uid]: gameId }`로 넘기세요. 이때 uid는 `uids`에 넣는 값과 같아야 합니다. `after`는 플레이어가 처음 나타날 때 읽으니, 봇에서 플레이어를 추가하기 전에 값을 넣어 두면 됩니다.
 - 플레이어마다 오래된 경기부터 오고, 지난 바퀴 이후 몇 판을 했든 빠뜨리지 않습니다.
 - `uids`에 배열이나 Set을 넣으면 매 바퀴 다시 읽으니, 나중에 추가해도 반영됩니다. 함수를 넣으면 매 바퀴 호출합니다.
 - 새 경기가 없으면 한 바퀴에 플레이어당 요청 1번이고, 캐시를 쓰지 않습니다. 기본값인 초당 1회면 60명 한 바퀴에 1분이 걸립니다.
@@ -191,8 +195,8 @@ const user = await er.getUserByNickname(SAMPLE_NICKNAME)
 
 | 도구 | 입력 | 결과 |
 |---|---|---|
-| `player_profile` | `nickname`, `games`(1~50, 기본 20) | 랭크 티어와 RP, 최근 경기 요약(코발트 제외), 많이 한 실험체, 이름으로 바꾼 최근 경기 |
-| `game_detail` | `gameId` | 그 경기의 참가자 전원, 팀별로 |
+| `player_profile` | `nickname`, `games`(1~50, 기본 20) | 랭크 티어와 RP, 최근 일반·랭크 경기 요약, 많이 한 실험체, 이름으로 바꾼 최근 경기 |
+| `game_detail` | `gameId` | 그 경기의 참가자 전원, 팀별로. AI 플레이어는 따로 표시 |
 | `top_ranks` | `limit`(1~100, 기본 20) | 현재 랭크 시즌 상위 플레이어 |
 
 기본 언어는 한국어입니다. `ER_LANGUAGE`(예: `English`)로 바꿀 수 있습니다.
@@ -205,6 +209,9 @@ const user = await er.getUserByNickname(SAMPLE_NICKNAME)
 - **닉네임 조회는 `uid`가 아니라 `userId`를 줍니다.** 실제 응답은 `userId`, 문서는 `uid`입니다. 둘 다 받아서 항상 `uid`로 돌려줍니다.
 - **돌아온 닉네임을 확인합니다.** 요청한 닉네임과 비교해(대소문자, 전각·반각 차이는 무시) 다르면 `ErNicknameMismatchError`를 던집니다.
 - **플레이어는 uid로 찾습니다.** `userNum` 조회는 없어졌습니다.
+- **uid는 고정된 ID가 아닙니다.** 닉네임을 조회할 때마다 다른 값이 옵니다. 예전 값도 한동안은 쓸 수 있습니다. 요청에만 쓰고 저장 키로 쓰지 마세요.
+- **순위 0은 순위가 아닙니다.** 이번 시즌 랭크를 안 한 플레이어에게도 API는 시작할 RP를 줍니다. `getUserRank`는 이때 null을 돌려줍니다.
+- **AI 플레이어도 행이 있습니다.** 일반과 낮은 티어 랭크에 들어옵니다. `isBotPlayer`로 구분합니다.
 - **`/v1/user/games`에는 그 플레이어 한 명의 기록만 있습니다.** 한 경기의 참가자 전원은 경기마다 `/v1/games/{gameId}`로 받아야 합니다.
 - **경기 기록은 오래 남지 않습니다.** 약 90일만 남습니다. 한 페이지에 약 10경기씩 오는데, 문서에는 없는 내용입니다. 필요한 건 직접 저장하세요.
 - **`next`는 경기 ID입니다.** 다음 요청에 그대로 넘기면 더 오래된 경기를 받습니다. 다음 페이지는 그 경기 바로 아래부터라서, `next=<gameId + 1>`이면 그 경기부터 옵니다.
@@ -213,7 +220,7 @@ const user = await er.getUserByNickname(SAMPLE_NICKNAME)
 - **현재 시즌이 프리시즌일 수 있습니다.** 시즌 사이에는 `isCurrent`가 랭크가 없는 `Pre-Season` 행을 가리킵니다. `currentRankedSeasonId`는 이때 직전 랭크 시즌을 돌려줍니다.
 - **코발트 프로토콜 모드 코드는 두 개입니다.** 지금 경기는 `matchingMode` 6, 예전 기록은 4입니다.
 - **번역은 JSON이 아니라 파일입니다.** `/v1/l10n/{language}`는 `키┃값` 줄로 된 텍스트 파일 주소를 줍니다.
-- **상위 랭킹은 페이지가 없습니다.** 한 번 받은 응답이 전부입니다(2026년 10월 기준 1,001명). uid 없이 닉네임만 옵니다.
+- **상위 랭킹은 페이지가 없습니다.** 한 번 받은 응답이 전부입니다(2026년 11월 기준 1,001명). uid 없이 닉네임만 옵니다.
 
 ## 넣지 않은 것
 

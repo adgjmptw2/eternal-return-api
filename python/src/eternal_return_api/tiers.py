@@ -25,7 +25,7 @@ TierKey = Literal[
 ]
 
 #: Last season with a checked table. Later seasons use it until the package is updated.
-LATEST_TIER_SEASON = 12
+LATEST_TIER_SEASON = 13
 
 
 @dataclass(frozen=True)
@@ -108,6 +108,10 @@ _LADDERS: dict[int, _Ladder] = {
     11: _by_rank([*_BASE_S5, *_steps("meteorite", [6400, 6700, 7000, 7300])], 7600),
     12: _rp([*_BASE_S5, *_steps("meteorite", [6400, 6700, 7000, 7300])], 7600, 8300, 300, (301, 1000)),
 }
+# Season 13 keeps season 12's table. The 13.0 and 13.1 patch notes change no tier line, and the
+# entry costs and tier bonuses in 13.1 games change at the same RP. The 8,300 line of Titan and
+# Immortal leaves no trace in game records, so only the patch notes back it.
+_LADDERS[13] = _LADDERS[12]
 
 _ENGLISH: dict[TierKey, str] = {
     "unranked": "Unranked",
@@ -159,7 +163,8 @@ def rank_tier(rp: float, *, rank: int | None = None, season: float | None = None
 
     ``rank`` is the leaderboard rank (``rank`` from ``get_user_rank``).
     ``demigod`` and ``eternity`` need it; without it, the top tier is
-    ``mithril``. ``season`` is the in-game season number (see
+    ``mithril``. Season rewards for these two tiers use the player's reward
+    server, so pass ``serverRank`` to match them. ``season`` is the in-game season number (see
     ``to_player_season``), default ``LATEST_TIER_SEASON``.
     """
     if not math.isfinite(rp) or rp < 1:

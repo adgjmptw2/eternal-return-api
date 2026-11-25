@@ -4,7 +4,6 @@ import asyncio
 import inspect
 import json
 import math
-import re
 import threading
 import time
 import unicodedata
@@ -28,7 +27,7 @@ import httpx
 
 from .cache import DEFAULT_CACHE_TTL, CacheKind, CacheStore, cache_kind_of
 from .errors import ErApiError, ErNicknameMismatchError
-from .games import is_game_finished
+from .games import is_game_finished, started_at
 from .limiter import AsyncRateLimiter, RateLimiter
 from .modes import MatchingMode, TeamMode
 from .names import GameNames, parse_l10n
@@ -98,20 +97,6 @@ class _Walk:
     stopped: _Stop = field(default="done", init=False)
 
 
-_OFFSET = re.compile(r"([+-]\d{2})(\d{2})$")
-
-
-def _started_at(game: UserGame) -> float | None:
-    """``startDtm`` as a timestamp. The API writes the offset as ``+0900``."""
-    text = game.get("startDtm")
-    if not isinstance(text, str):
-        return None
-    try:
-        return datetime.fromisoformat(_OFFSET.sub(r"\1:\2", text)).timestamp()
-    except ValueError:
-        return None
-
-
 def _walk_options(
     after: int | None,
     before: int | None,
@@ -173,6 +158,18 @@ def _same_nickname(a: str, b: str) -> bool:
 def _array(body: Envelope, key: str) -> list[Any]:
     value = body.get(key)
     return value if isinstance(value, list) else []
+
+
+def _placed(rank: Any) -> dict[str, Any] | None:
+    """Rank 0 means no ranked game in the season."""
+    if not isinstance(rank, dict):
+        return None
+    place = rank.get("rank")
+    return rank if isinstance(place, int) and place > 0 else None
+
+
+def _top_path(season_id: int, team_mode: int, server_code: int | None) -> str:
+    return f"/v1/rank/top/{season_id}/{team_mode}" + ("" if server_code is None else f"/{server_code}")
 
 
 def _quote(value: str) -> str:
@@ -435,7 +432,12 @@ class ErClient(_Base):
             raise
 
     def get_user_by_nickname(self, nickname: str) -> ErUser | None:
-        """Nickname → uid. None if no such player."""
+        """Nickname → uid. None if no such player.
+
+        Each lookup returns a different uid for the same player; see
+        ``ErUser``. During the game's maintenance the API answers as if no
+        player exists.
+        """
         return self._or_empty(lambda: self._user(self.request(f"/v1/user/nickname?query={_quote(nickname)}"), nickname), None)
 
     def get_user_games(self, uid: str, next: int | None = None, *, fresh: bool = False) -> UserGamesPage:
@@ -465,7 +467,7 @@ class ErClient(_Base):
                 game_id = game.get("gameId")
                 if walk.after is not None and isinstance(game_id, int) and game_id <= walk.after:
                     return
-                started = _started_at(game)
+                started = started_at(game)
                 if walk.since is not None and started is not None and started < walk.since:
                     return
                 yield game
@@ -601,20 +603,28 @@ class ErClient(_Base):
         return self._or_empty(lambda: _array(self._load(path), "userGames"), [])
 
     def get_user_rank(self, uid: str, season_id: int, team_mode: int = TeamMode.SQUAD) -> dict[str, Any] | None:
-        """A player's ranked standing. None if unranked."""
+        """A player's ranked standing. None without a ranked game in that season:
+        the API then sends rank 0 with the RP the player would start from."""
 
         def load() -> dict[str, Any] | None:
             rank = self.request(f"/v1/rank/uid/{_quote(uid)}/{season_id}/{team_mode}").get("userRank")
-            return rank if isinstance(rank, dict) else None
+            return _placed(rank)
 
         return self._or_empty(load, None)
 
-    def get_top_ranks(self, season_id: int, team_mode: int = TeamMode.SQUAD) -> list[dict[str, Any]]:
-        """Top of the ladder. One response, no paging. Rows have nicknames, not uids."""
-        return self._or_empty(lambda: _array(self.request(f"/v1/rank/top/{season_id}/{team_mode}"), "topRanks"), [])
+    def get_top_ranks(
+        self, season_id: int, team_mode: int = TeamMode.SQUAD, server_code: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Top of the ladder. One response, no paging. Rows have nicknames, not
+        uids. With ``server_code``, that server's own leaderboard (``serverCode``
+        in ``get_user_rank``, e.g. 10)."""
+        path = _top_path(season_id, team_mode, server_code)
+        return self._or_empty(lambda: _array(self.request(path), "topRanks"), [])
 
     def get_user_stats(self, uid: str, season_id: int, matching_mode: int = MatchingMode.RANKED) -> list[dict[str, Any]]:
-        """Season stats for normal (2) or ranked (3) games."""
+        """A player's stats in a ranked season. Normal and Cobalt Protocol stats
+        have no season: season 0 returns both, in separate rows, whatever the
+        ``matching_mode``. A ranked season with mode 2 returns nothing."""
         path = f"/v2/user/stats/uid/{_quote(uid)}/{season_id}/{matching_mode}"
         return self._or_empty(lambda: _array(self.request(path), "userStats"), [])
 
@@ -819,7 +829,12 @@ class AsyncErClient(_Base):
             raise
 
     async def get_user_by_nickname(self, nickname: str) -> ErUser | None:
-        """Nickname → uid. None if no such player."""
+        """Nickname → uid. None if no such player.
+
+        Each lookup returns a different uid for the same player; see
+        ``ErUser``. During the game's maintenance the API answers as if no
+        player exists.
+        """
 
         async def load() -> ErUser | None:
             return self._user(await self.request(f"/v1/user/nickname?query={_quote(nickname)}"), nickname)
@@ -855,7 +870,7 @@ class AsyncErClient(_Base):
                 game_id = game.get("gameId")
                 if walk.after is not None and isinstance(game_id, int) and game_id <= walk.after:
                     return
-                started = _started_at(game)
+                started = started_at(game)
                 if walk.since is not None and started is not None and started < walk.since:
                     return
                 yield game
@@ -971,26 +986,34 @@ class AsyncErClient(_Base):
         return await self._or_empty(load(), [])
 
     async def get_user_rank(self, uid: str, season_id: int, team_mode: int = TeamMode.SQUAD) -> dict[str, Any] | None:
-        """A player's ranked standing. None if unranked."""
+        """A player's ranked standing. None without a ranked game in that season:
+        the API then sends rank 0 with the RP the player would start from."""
 
         async def load() -> dict[str, Any] | None:
             rank = (await self.request(f"/v1/rank/uid/{_quote(uid)}/{season_id}/{team_mode}")).get("userRank")
-            return rank if isinstance(rank, dict) else None
+            return _placed(rank)
 
         return await self._or_empty(load(), None)
 
-    async def get_top_ranks(self, season_id: int, team_mode: int = TeamMode.SQUAD) -> list[dict[str, Any]]:
-        """Top of the ladder. One response, no paging. Rows have nicknames, not uids."""
+    async def get_top_ranks(
+        self, season_id: int, team_mode: int = TeamMode.SQUAD, server_code: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Top of the ladder. One response, no paging. Rows have nicknames, not
+        uids. With ``server_code``, that server's own leaderboard (``serverCode``
+        in ``get_user_rank``, e.g. 10)."""
+        path = _top_path(season_id, team_mode, server_code)
 
         async def load() -> list[dict[str, Any]]:
-            return _array(await self.request(f"/v1/rank/top/{season_id}/{team_mode}"), "topRanks")
+            return _array(await self.request(path), "topRanks")
 
         return await self._or_empty(load(), [])
 
     async def get_user_stats(
         self, uid: str, season_id: int, matching_mode: int = MatchingMode.RANKED
     ) -> list[dict[str, Any]]:
-        """Season stats for normal (2) or ranked (3) games."""
+        """A player's stats in a ranked season. Normal and Cobalt Protocol stats
+        have no season: season 0 returns both, in separate rows, whatever the
+        ``matching_mode``. A ranked season with mode 2 returns nothing."""
         path = f"/v2/user/stats/uid/{_quote(uid)}/{season_id}/{matching_mode}"
 
         async def load() -> list[dict[str, Any]]:

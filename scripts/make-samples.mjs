@@ -8,7 +8,7 @@ import { writeFileSync, mkdirSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
 // Small seeded PRNG, so the file does not change between runs.
-let seed = 20261102
+let seed = 20261126
 const rand = () => {
   seed = (seed + 0x6d2b79f5) | 0
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
@@ -18,7 +18,7 @@ const rand = () => {
 const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1))
 const pick = (list) => list[int(0, list.length - 1)]
 
-const SEASON_ID = 41
+const SEASON_ID = 43
 const UID = 'sample-uid-1'
 
 // Weapon type keys and numbers are the API's enum (see WEAPON_TYPES).
@@ -85,6 +85,10 @@ const kst = (ms) => {
 }
 const DAY = 86_400_000
 let nextPlayer = 2
+// Season 13 tier lines in the sample's RP range, and the entry cost there.
+const TIER_LINES = [6400, 7600]
+const tierOf = (rp) => TIER_LINES.filter((line) => rp >= line).length
+const entryCost = (rp) => (rp < 7600 ? -53 - Math.floor((rp - 6400) / 300) : -58 - 2 * Math.floor((rp - 7600) / 250))
 
 function makeGame(gameId, startMs, teams, meTeam, meRank) {
   const rows = []
@@ -99,6 +103,13 @@ function makeGame(gameId, startMs, teams, meTeam, meRank) {
     const down2 = int(0, 2)
     const gainInGame = Math.max(0, 140 - rank * 18) + int(0, 10)
     const premade = pick([[1, 1, 1], [1, 2, 2], [3, 3, 3]])
+    const field = pick(['Material', 'Energy', 'Biotechnology'])
+    const firstTask = { Material: 10011, Energy: 20011, Biotechnology: 30011 }[field]
+    const tasks = rank === teams ? [] : [
+      { experimentGroupId: firstTask, firstClearElapsedSeconds: 250 + int(0, 30), clearCount: 1 },
+      { experimentGroupId: firstTask + 10, firstClearElapsedSeconds: 300 + int(0, 200), clearCount: int(1, 6) },
+    ]
+    const repeats = tasks.slice(1).reduce((s, step) => s + step.clearCount, 0)
     for (let m = 0; m < 3; m++) {
       const me = t === meTeam && m === 0
       const ch = me ? characters[0] : pick(characters)
@@ -115,16 +126,22 @@ function makeGame(gameId, startMs, teams, meTeam, meRank) {
       const gaveUp = t === 3 && m === 2
       const rowRank = gaveUp ? Math.min(teams, rank + 2) : rank
       const rowDuration = gaveUp ? duration - 160 : duration
-      const before = int(7000, 9000)
-      const cost = -int(66, 72)
+      // The sample player's win moves them up to Mythril.
+      const before = me && rank === 1 ? 7560 : int(6500, 8300)
+      // Who left pays twice, and their RP is in rankPoint only.
+      const cost = entryCost(before) * (gaveUp ? 2 : 1)
+      const earned = gaveUp ? 0 : gainInGame + int(0, 3)
+      const base = before + earned + cost
+      const bonus = gaveUp ? 0 : 50 * (tierOf(base) - tierOf(before))
+      const change = gaveUp ? 0 : earned + cost + bonus
       const playTime = rowDuration - int(0, 60)
       rows.push({
         gameId,
         seasonId: SEASON_ID,
         matchingMode: 3,
         matchingTeamMode: 3,
-        versionSeason: 12,
-        versionMajor: 6,
+        versionSeason: 13,
+        versionMajor: 1,
         versionMinor: 0,
         nickname: me ? 'Player1' : `Player${nextPlayer++}`,
         teamNumber: t,
@@ -154,11 +171,19 @@ function makeGame(gameId, startMs, teams, meTeam, meRank) {
         damageToMonster: int(10000, 60000),
         damageFromPlayer: int(5000, 35000),
         mmrBefore: before,
-        mmrGainInGame: gainInGame,
+        mmrGainInGame: earned,
         mmrLossEntryCost: cost,
-        mmrGain: gainInGame + cost,
-        mmrAfter: before + gainInGame + cost,
-        rankPoint: before + gainInGame + cost,
+        mmrGain: change,
+        mmrGainGambit: change,
+        mmrAfter: gaveUp ? 0 : before + change,
+        rankPoint: base,
+        experimentResultType: tasks.length ? field : undefined,
+        questStepClear: tasks,
+        crExperimentReward: repeats * 4,
+        crExperimentalCredit: field === 'Energy' && tasks.length ? 15 : 0,
+        isMLBot: false,
+        mlbot: false,
+        matchSize: teams * 3,
         preMade: premade[m],
         botAdded: 0,
         botRemain: 0,
@@ -177,7 +202,7 @@ function makeGame(gameId, startMs, teams, meTeam, meRank) {
   return rows
 }
 
-const now = Date.UTC(2026, 9, 20, 6, 30, 7)
+const now = Date.UTC(2026, 10, 24, 6, 30, 7)
 const games = [
   makeGame(1000002, now, 8, 2, 1),
   makeGame(1000001, now - DAY + 3600_000 * 2 + 13_000, 7, 4, 5),
@@ -185,7 +210,7 @@ const games = [
 const myRows = games.map((g) => g.find((r) => r.nickname === 'Player1'))
 
 // Leaderboard of 1,001 made-up players; Player1 is in it.
-const board = Array.from({ length: 1001 }, (_, i) => ({ nickname: `Ranker${i + 1}`, rank: i + 1, mmr: 11000 - i * 3 }))
+const board = Array.from({ length: 1001 }, (_, i) => ({ nickname: `Ranker${i + 1}`, rank: i + 1, mmr: 9400 - i * 2 }))
 const myRank = 950
 board[myRank - 1] = { nickname: 'Player1', rank: myRank, mmr: board[myRank - 1].mmr }
 
@@ -194,12 +219,14 @@ const bodies = {
   '/v1/user/nickname?query=Player1': ok({ user: { userId: UID, nickname: 'Player1' } }),
   [`/v1/user/games/uid/${UID}`]: ok({ userGames: myRows }),
   [`/v1/rank/top/${SEASON_ID}/3`]: ok({ topRanks: board }),
-  [`/v1/rank/uid/${UID}/${SEASON_ID}/3`]: ok({ userRank: { nickname: 'Player1', rank: myRank, mmr: board[myRank - 1].mmr } }),
+  [`/v1/rank/uid/${UID}/${SEASON_ID}/3`]: ok({
+    userRank: { nickname: 'Player1', rank: myRank, mmr: board[myRank - 1].mmr, serverCode: 10, rewardServerCode: 10, serverRank: 0 },
+  }),
   '/v2/data/Season': ok({
     data: [
-      { seasonID: 39, seasonName: 'Season20', seasonStart: '2026-02-12 12:00:00', seasonEnd: '2026-05-14 09:00:00', isCurrent: 0 },
-      { seasonID: 40, seasonName: 'Pre-Season21', seasonStart: '2026-05-14 12:00:00', seasonEnd: '2026-06-11 09:00:00', isCurrent: 0 },
-      { seasonID: 41, seasonName: 'Season21', seasonStart: '2026-06-11 12:00:00', seasonEnd: '2026-09-10 09:00:00', isCurrent: 1 },
+      { seasonID: 41, seasonName: 'Season21', seasonStart: '2026-07-02 12:00:00', seasonEnd: '2026-10-08 09:00:00', isCurrent: 0 },
+      { seasonID: 42, seasonName: 'Pre-Season22', seasonStart: '2026-10-08 12:00:00', seasonEnd: '2026-10-15 12:00:00', isCurrent: 0 },
+      { seasonID: 43, seasonName: 'Season22', seasonStart: '2026-10-15 12:00:00', seasonEnd: '2027-01-14 09:00:00', isCurrent: 1 },
     ],
   }),
   '/v2/data/TacticalSkillSetGroup': ok({ data: tacticalGroups.map((g) => ({ ...g, modeType: 0, active: true })) }),
@@ -243,16 +270,19 @@ for (const [language, i] of [['Korean', 0], ['English', 1]]) {
 const ms = (dtm) => Date.parse(dtm.replace(/(\.\d{3})(\+\d\d)(\d\d)$/, '$1$2:$3'))
 for (const rows of games) {
   for (const p of rows) {
+    const left = p.giveUp === 1
     const holds =
-      p.mmrAfter === p.mmrBefore + p.mmrGain &&
-      p.mmrGain === p.mmrGainInGame + p.mmrLossEntryCost &&
-      p.rankPoint === p.mmrAfter &&
+      p.mmrAfter === (left ? 0 : p.mmrBefore + p.mmrGainGambit) &&
+      p.rankPoint === p.mmrBefore + p.mmrGainInGame + p.mmrLossEntryCost &&
+      (left || [-50, 0, 50].includes(p.mmrAfter - p.rankPoint)) &&
       p.totalTime === p.playTime + p.watchTime &&
       Math.abs(ms(p.expireDtm) - ms(p.startDtm) - (90 * 86400 + p.duration) * 1000) <= 5000
     if (!holds) throw new Error(`field relations broke in game ${p.gameId}`)
   }
   if (!rows.some((p) => p.gameRank === 1)) throw new Error('a sample game has no winner')
 }
+const all = games.flat()
+if (!all.some((p) => p.mmrAfter - p.rankPoint === 50)) throw new Error('no sample player moves up a tier')
 
 const text = JSON.stringify({ seasonId: SEASON_ID, uid: UID, bodies, files })
 mkdirSync(new URL('../samples/', import.meta.url), { recursive: true })

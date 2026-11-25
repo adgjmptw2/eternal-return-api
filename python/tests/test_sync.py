@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 import pytest
-from conftest import Clock, FakeApi, make_async_client, make_client, row
+from conftest import Clock, FakeApi, live_row, make_async_client, make_client, row
 
 from eternal_return_api import (
     ErClient,
@@ -94,15 +94,15 @@ def test_since_stops_at_older_games() -> None:
 
 def test_is_game_finished_looks_for_the_winner() -> None:
     assert not is_game_finished([])
-    assert not is_game_finished([row(1, gameRank=5), row(1, gameRank=2)])
-    assert is_game_finished([row(1, gameRank=5), row(1, gameRank=1)])
+    assert not is_game_finished([live_row(1, gameRank=5), live_row(1, gameRank=2)])
+    assert is_game_finished([live_row(1, gameRank=5), live_row(1, gameRank=1)])
 
 
 def test_get_game_does_not_cache_an_unfinished_game() -> None:
     finished = False
 
     def game() -> list[dict[str, Any]]:
-        return [row(7, gameRank=1), row(7, gameRank=4)] if finished else [row(7, gameRank=4)]
+        return [row(7, gameRank=1), row(7, gameRank=4)] if finished else [live_row(7, gameRank=4)]
 
     api = FakeApi(games={"7": game})
     er = make_client(api, cache=MemoryCache())
@@ -113,8 +113,16 @@ def test_get_game_does_not_cache_an_unfinished_game() -> None:
     assert api.calls.count("/v1/games/7") == 2
 
 
-def test_request_does_not_cache_an_unfinished_game_either() -> None:
+def test_get_game_caches_a_game_without_a_winner_row_once_it_must_be_over() -> None:
     api = FakeApi(games={"7": lambda: [row(7, gameRank=4)]})
+    er = make_client(api, cache=MemoryCache())
+    er.get_game(7)
+    er.get_game(7)
+    assert len(api.calls) == 1
+
+
+def test_request_does_not_cache_an_unfinished_game_either() -> None:
+    api = FakeApi(games={"7": lambda: [live_row(7, gameRank=4)]})
     er = make_client(api, cache=MemoryCache())
     er.request("/v1/games/7")
     er.get_game(7)
@@ -363,7 +371,7 @@ def test_async_watch_stop_event_ends_the_wait() -> None:
 
 
 def test_async_get_game_shares_one_request_and_skips_unfinished_cache() -> None:
-    api = FakeApi(games={"7": lambda: [row(7, gameRank=1)], "8": lambda: [row(8, gameRank=4)]})
+    api = FakeApi(games={"7": lambda: [row(7, gameRank=1)], "8": lambda: [live_row(8, gameRank=4)]})
 
     async def main() -> None:
         er = make_async_client(api, cache=MemoryCache())

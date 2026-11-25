@@ -13,17 +13,19 @@ class MatchingMode:
     #: Cobalt Protocol in older records. New games use 6.
     COBALT_LEGACY = 4
     LONE_WOLF = 9
+    #: Rumble Out, an event mode with 5 teams of 3. Ran November 12 to 18, 2026.
+    RUMBLE_OUT = 13
 
 
 class TeamMode:
-    """``matchingTeamMode`` values."""
+    """``matchingTeamMode`` values. Rumble Out uses 3, like the squad modes."""
 
     LONE_WOLF = 1
     SQUAD = 3
     COBALT = 4
 
 
-GameModeName = Literal["rank", "normal", "cobalt", "loneWolf", "unknown"]
+GameModeName = Literal["rank", "normal", "cobalt", "loneWolf", "rumbleOut", "unknown"]
 
 _MODE_NAMES: dict[int, GameModeName] = {
     MatchingMode.RANKED: "rank",
@@ -31,6 +33,7 @@ _MODE_NAMES: dict[int, GameModeName] = {
     MatchingMode.COBALT: "cobalt",
     MatchingMode.COBALT_LEGACY: "cobalt",
     MatchingMode.LONE_WOLF: "loneWolf",
+    MatchingMode.RUMBLE_OUT: "rumbleOut",
 }
 
 

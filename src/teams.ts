@@ -1,3 +1,4 @@
+import { isBotPlayer } from './games.js'
 import type { UserGame } from './types.js'
 
 export interface GameTeam {
@@ -9,7 +10,13 @@ export interface GameTeam {
    * keep the rank and team kills from when they left.
    */
   gameRank: number
+  /**
+   * Whether the team placed 1st. When an AI team wins, the API sends
+   * `victory` 0 in every row.
+   */
   victory: boolean
+  /** How many of the players are AI (see `isBotPlayer`). */
+  bots: number
   /**
    * `teamKill` from the same row as `gameRank`. If missing, the highest
    * `teamKill` among members who did not give up, else the sum of member kills.
@@ -76,7 +83,8 @@ export function groupTeams(players: Iterable<UserGame>): GameTeam[] {
     teams.push({
       teamNumber,
       gameRank: last.gameRank,
-      victory: members.some((p) => p.victory === 1),
+      victory: last.gameRank === 1,
+      bots: members.filter(isBotPlayer).length,
       teamKills: typeof last.teamKill === 'number' ? last.teamKill : maxTeamKill(members) ?? kills,
       assists: members.reduce((n, p) => n + (p.playerAssistant ?? 0), 0),
       damageToPlayer: members.reduce((n, p) => n + (p.damageToPlayer ?? 0), 0),

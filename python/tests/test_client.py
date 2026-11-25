@@ -298,3 +298,31 @@ def test_aclose_cancels_running_requests() -> None:
         assert not er._tasks
 
     asyncio.run(main())
+
+
+def test_rank_is_none_without_a_ranked_game_and_top_ranks_take_a_server() -> None:
+    # Live, season 13: rank 0 comes with the RP the player would start from.
+    new = {"mmr": 3000, "nickname": "n", "rank": 0, "serverCode": 0, "rewardServerCode": 0, "serverRank": 0}
+    routes = {
+        "/v1/rank/uid/new/43/3": lambda: ok(userRank=new),
+        "/v1/rank/uid/played/43/3": lambda: ok(userRank={**new, "rank": 90000, "mmr": 60}),
+        "/v1/rank/uid/none/43/3": lambda: ok(),
+        "/v1/rank/top/43/3": lambda: ok(topRanks=[{"rank": 1}, {"rank": 2}]),
+        "/v1/rank/top/43/3/10": lambda: ok(topRanks=[{"rank": 1}]),
+    }
+    er = make_client(FakeApi(routes=routes))
+    assert er.get_user_rank("new", 43) is None
+    assert er.get_user_rank("none", 43) is None
+    played = er.get_user_rank("played", 43)
+    assert played is not None and played["rank"] == 90000
+    assert len(er.get_top_ranks(43)) == 2
+    assert len(er.get_top_ranks(43, server_code=10)) == 1
+    assert er.get_top_ranks(43, server_code=99) == []
+
+    async def main() -> None:
+        async_er = make_async_client(FakeApi(routes=routes))
+        assert await async_er.get_user_rank("new", 43) is None
+        assert await async_er.get_user_rank("played", 43) is not None
+        assert len(await async_er.get_top_ranks(43, server_code=10)) == 1
+
+    asyncio.run(main())

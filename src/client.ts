@@ -1,6 +1,6 @@
 import { DEFAULT_CACHE_TTL_MS, cacheKindOf, type CacheKind, type CacheStore } from './cache.js'
 import { ErApiError, ErNicknameMismatchError } from './errors.js'
-import { isGameFinished } from './games.js'
+import { isGameFinished, startTimeOf } from './games.js'
 import {
   buildGameData,
   type CharacterMasteryRow,
@@ -219,7 +219,7 @@ export class ErClient {
     let loading = this.inFlight.get(key)
     if (!loading) {
       // An unfinished game changes as players finish, so it is never cached.
-      const keep = kind === 'game' ? (body: Envelope) => isGameFinished(arrayField<UserGame>(body, 'userGames')) : undefined
+      const keep = kind === 'game' ? (body: Envelope) => isGameFinished(arrayField<UserGame>(body, 'userGames'), this.now()) : undefined
       loading = this.loadThroughCache(cache, key, path, ttl, keep).finally(() => this.inFlight.delete(key))
       this.inFlight.set(key, loading)
     }
@@ -333,7 +333,11 @@ export class ErClient {
     }
   }
 
-  /** Nickname → uid. Null if no such player. */
+  /**
+   * Nickname → uid. Null if no such player. Each lookup returns a different
+   * uid for the same player; see `ErUser.uid`. During the game's maintenance
+   * the API answers as if no player exists.
+   */
   async getUserByNickname(nickname: string): Promise<ErUser | null> {
     return this.orEmpty(async () => {
       const body = await this.request(`/v1/user/nickname?query=${encodeURIComponent(nickname)}`)
@@ -423,7 +427,7 @@ export class ErClient {
       const result = await this.loadUserGames(uid, next, fresh && page === 0)
       for (const game of result.games) {
         if (after !== undefined && game.gameId <= after) return 'done'
-        if (since !== undefined && Date.parse(game.startDtm) < since) return 'done'
+        if (since !== undefined && startTimeOf(game) < since) return 'done'
         yield game
       }
       if (result.next === undefined) return 'done'
@@ -520,7 +524,10 @@ export class ErClient {
     }, [])
   }
 
-  /** A player's ranked standing. Null if unranked. */
+  /**
+   * A player's ranked standing. Null without a ranked game in that season: the
+   * API then sends rank 0 with the RP the player would start from.
+   */
   async getUserRank(
     uid: string,
     seasonId: number,
@@ -530,19 +537,32 @@ export class ErClient {
       const body = await this.request(
         `/v1/rank/uid/${encodeURIComponent(uid)}/${seasonId}/${teamMode}`,
       )
-      return (body.userRank as UserRank | undefined) ?? null
+      const rank = body.userRank as UserRank | undefined
+      return rank && rank.rank > 0 ? rank : null
     }, null)
   }
 
-  /** Top of the ladder. One response, no paging. */
-  async getTopRanks(seasonId: number, teamMode: number = TeamMode.SQUAD): Promise<TopRankEntry[]> {
+  /**
+   * Top of the ladder. One response, no paging. With `serverCode`, that
+   * server's own leaderboard (`UserRank.serverCode`, e.g. 10).
+   */
+  async getTopRanks(
+    seasonId: number,
+    teamMode: number = TeamMode.SQUAD,
+    serverCode?: number,
+  ): Promise<TopRankEntry[]> {
     return this.orEmpty(async () => {
-      const body = await this.request(`/v1/rank/top/${seasonId}/${teamMode}`)
+      const server = serverCode === undefined ? '' : `/${serverCode}`
+      const body = await this.request(`/v1/rank/top/${seasonId}/${teamMode}${server}`)
       return arrayField<TopRankEntry>(body, 'topRanks')
     }, [])
   }
 
-  /** Season stats for normal (2) or ranked (3) games. */
+  /**
+   * A player's stats in a ranked season. Normal and Cobalt Protocol stats have
+   * no season: season 0 returns both, in separate rows, whatever the
+   * `matchingMode`. A ranked season with mode 2 returns nothing.
+   */
   async getUserStats(
     uid: string,
     seasonId: number,

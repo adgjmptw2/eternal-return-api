@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { rankTier, buildGameNames, parseL10n } from '../dist/index.js'
+import { LATEST_TIER_SEASON, rankTier, buildGameNames, parseL10n } from '../dist/index.js'
 
 const name = (rp, options) => rankTier(rp, options).name
 
@@ -13,6 +13,24 @@ test('rankTier: divisions and boundaries (season 12)', () => {
   assert.equal(name(6400), 'Meteorite 4')
   assert.deepEqual(rankTier(7599), { tier: 'meteorite', division: 1, name: 'Meteorite 1', minRp: 7300, maxRp: 7599 })
   assert.equal(name(7600), 'Mythril')
+})
+
+test('rankTier: season 13 has the lines 13.1 entry costs change at', () => {
+  assert.equal(LATEST_TIER_SEASON, 13)
+  // RP where the entry cost changed in 3,771 rows of 13.0 and 13.1 ranked games.
+  const lines = [
+    600, 800, 1000, 1200, 1400, 1650, 1900, 2150, 2400, 2700, 3000, 3300, 3600, 3950, 4300, 4650,
+    5000, 5350, 5700, 6050, 6400, 6700, 7000, 7300, 7600,
+  ]
+  for (const rp of lines) {
+    assert.equal(rankTier(rp, { season: 13 }).minRp, rp)
+    assert.notEqual(name(rp, { season: 13 }), name(rp - 1, { season: 13 }))
+  }
+  for (const rp of [1, 5049, 7599, 7600, 8300, 9000]) {
+    for (const rank of [undefined, 1, 301, 1001]) {
+      assert.deepEqual(rankTier(rp, { season: 13, rank }), rankTier(rp, { season: 12, rank }))
+    }
+  }
 })
 
 test('rankTier: season 12 leaderboard needs 8300 RP and a rank', () => {

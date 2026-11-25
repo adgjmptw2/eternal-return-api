@@ -5,7 +5,9 @@
 
 export { ErClient, DEFAULT_BASE_URL } from './client.js'
 export type { ErClientOptions, SyncOptions, SyncResult, UserGamesOptions, WatchEvent, WatchOptions } from './client.js'
-export { isGameFinished } from './games.js'
+export { isBotPlayer, isGameFinished } from './games.js'
+export { rpChange } from './rp.js'
+export type { RpChange } from './rp.js'
 export { ErApiError, ErNicknameMismatchError } from './errors.js'
 export { MatchingMode, TeamMode, gameModeName } from './modes.js'
 export type { GameModeName } from './modes.js'
@@ -48,6 +50,7 @@ export type {
   CharacterStat,
   Envelope,
   ErUser,
+  QuestStepClear,
   TopRankEntry,
   UserGame,
   UserGamesPage,

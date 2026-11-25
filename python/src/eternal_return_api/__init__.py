@@ -17,8 +17,11 @@ from .games import (
     GamesSummary,
     GameSummary,
     GameTeam,
+    RpChange,
     group_teams,
+    is_bot_player,
     is_game_finished,
+    rp_change,
     summarize_games,
 )
 from .limiter import AsyncRateLimiter, RateLimiter
@@ -26,9 +29,9 @@ from .modes import GameModeName, MatchingMode, TeamMode, game_mode_name
 from .names import L10N_SEPARATOR, WEAPON_TYPES, GameNames, parse_l10n, strip_tags
 from .seasons import SeasonCatalog, parse_season_number, to_player_season
 from .tiers import LATEST_TIER_SEASON, RankTier, TierKey, rank_tier
-from .types import Envelope, ErUser, UserGame
+from .types import Envelope, ErUser, QuestStepClear, UserGame
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "DEFAULT_BASE_URL",
@@ -55,8 +58,10 @@ __all__ = [
     "GamesSummary",
     "MatchingMode",
     "MemoryCache",
+    "QuestStepClear",
     "RankTier",
     "RateLimiter",
+    "RpChange",
     "SeasonCatalog",
     "SyncResult",
     "TeamMode",
@@ -67,10 +72,12 @@ __all__ = [
     "cache_kind_of",
     "game_mode_name",
     "group_teams",
+    "is_bot_player",
     "is_game_finished",
     "parse_l10n",
     "parse_season_number",
     "rank_tier",
+    "rp_change",
     "strip_tags",
     "summarize_games",
     "to_player_season",

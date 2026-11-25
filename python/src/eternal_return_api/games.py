@@ -1,16 +1,36 @@
-"""Helpers over game rows: finished check, teams, summaries."""
+"""Helpers over game rows: finished check, AI players, RP, teams, summaries."""
 
 from __future__ import annotations
 
 import math
+import re
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
+from .modes import MatchingMode
 from .types import UserGame
 
+#: Longer than any game: the longest of 1,029 checked games took 27 minutes.
+_GAME_SURELY_OVER = 3600
 
-def is_game_finished(players: Iterable[UserGame]) -> bool:
+_OFFSET = re.compile(r"([+-]\d{2})(\d{2})$")
+
+
+def started_at(game: UserGame) -> float | None:
+    """``startDtm`` as a timestamp. The API writes the offset as ``+0900``."""
+    text = game.get("startDtm")
+    if not isinstance(text, str):
+        return None
+    try:
+        return datetime.fromisoformat(_OFFSET.sub(r"\1:\2", text)).timestamp()
+    except ValueError:
+        return None
+
+
+def is_game_finished(players: Iterable[UserGame], now: float | None = None) -> bool:
     """Whether a ``get_game`` result is the finished game.
 
     A game fetched while other teams are still playing has only the players
@@ -18,10 +38,57 @@ def is_game_finished(players: Iterable[UserGame]) -> bool:
     later showed teammates as missing. Check this before storing a game for
     good.
 
-    A finished game has a row with ``gameRank`` 1 (Cobalt Protocol too). The
-    row count is not a test: finished games can have fewer than 24 rows.
+    A game is finished once a row has ``gameRank`` 1 (Cobalt Protocol too), or
+    an hour after it started. The hour covers beginner games against AI players
+    that have no rows: when one of their teams wins, no row ever has rank 1.
+    The row count is not a test: finished games can have fewer than 24 rows.
+
+    ``now`` is a timestamp, for tests. Default: the current time.
     """
-    return any(player.get("gameRank") == 1 for player in players)
+    start: float | None = None
+    for player in players:
+        if player.get("gameRank") == 1:
+            return True
+        if start is None:
+            start = started_at(player)
+    if start is None:
+        return False
+    return (time.time() if now is None else now) - start > _GAME_SURELY_OVER
+
+
+def is_bot_player(player: UserGame) -> bool:
+    """Whether a ``get_game`` row is an AI player.
+
+    Normal games and lower ranked games can include them, with a nickname, a
+    rank and RP like anyone else.
+    """
+    return player.get("isMLBot") is True or player.get("mlbot") is True
+
+
+@dataclass(frozen=True)
+class RpChange:
+    before: int
+    after: int
+
+    @property
+    def change(self) -> int:
+        """``after - before``."""
+        return self.after - self.before
+
+
+def rp_change(game: UserGame) -> RpChange | None:
+    """RP before and after a ranked game. None for other modes.
+
+    ``mmrAfter`` is right except for a player who left and paid the penalty:
+    ``mmrAfter`` and ``mmrGain`` are 0, and ``rankPoint`` has the RP they were
+    left with. ``mmrGain`` alone also misses games whose RP change was doubled.
+    """
+    before = game.get("mmrBefore")
+    if game.get("matchingMode") != MatchingMode.RANKED or not isinstance(before, int):
+        return None
+    left = game.get("giveUp") == 1 and game.get("mmrAfter") == 0
+    after = game.get("rankPoint") if left else game.get("mmrAfter")
+    return RpChange(before, after) if isinstance(after, int) else None
 
 
 def _num(value: Any) -> float:
@@ -35,6 +102,8 @@ class GameTeam:
     #: From a member who did not give up and stayed longest. A player who gave
     #: up can keep the rank and team kills from when they left.
     game_rank: int
+    #: Whether the team placed 1st. When an AI team wins, the API sends
+    #: ``victory`` 0 in every row.
     victory: bool
     #: ``teamKill`` from the same row as ``game_rank``. If missing, the highest
     #: ``teamKill`` among members who did not give up, else the sum of member kills.
@@ -43,6 +112,8 @@ class GameTeam:
     damage_to_player: int
     #: Most kills first.
     players: list[UserGame] = field(default_factory=list)
+    #: How many of the players are AI (see ``is_bot_player``).
+    bots: int = 0
 
 
 def _stay_score(p: UserGame) -> tuple[int, float]:
@@ -79,11 +150,12 @@ def group_teams(players: Iterable[UserGame]) -> list[GameTeam]:
             GameTeam(
                 team_number=team_number,
                 game_rank=int(_num(last.get("gameRank"))),
-                victory=any(p.get("victory") == 1 for p in members),
+                victory=last.get("gameRank") == 1,
                 team_kills=team_kill,
                 assists=sum(int(_num(p.get("playerAssistant"))) for p in members),
                 damage_to_player=sum(int(_num(p.get("damageToPlayer"))) for p in members),
                 players=sorted(members, key=lambda p: -_num(p.get("playerKill"))),
+                bots=sum(is_bot_player(p) for p in members),
             )
         )
 
@@ -167,12 +239,15 @@ class _Totals:
 def summarize_games(games: Iterable[UserGame]) -> GamesSummary:
     """Totals and per-character stats for a list of games.
 
-    Mixing modes skews the numbers (Cobalt Protocol ranks teams differently),
-    so filter by ``matchingMode`` first when that matters.
+    AI players (``is_bot_player``) are skipped. Mixing modes skews the numbers
+    (Cobalt Protocol has 2 teams, Rumble Out 5), so filter by ``matchingMode``
+    first when that matters.
     """
     overall = _Totals()
     by_character: dict[int, _Totals] = {}
     for game in games:
+        if is_bot_player(game):
+            continue
         overall.add(game)
         character = int(_num(game.get("characterNum")))
         by_character.setdefault(character, _Totals()).add(game)

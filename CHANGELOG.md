@@ -1,6 +1,37 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
+
+Python 0.2.0 has the same changes.
+
+Season 13 (13.0 and 13.1). The field guide's RP and team rules came from 30 games, most of them by top players. They were checked again on 1,029 games of all ranks, and several were wrong or incomplete.
+
+Changed results:
+
+- `getUserRank` returns null when the API sends rank 0. Players without a ranked game in the season got the RP they would start from, and the MCP server and the bot example showed it as their tier.
+- `isGameFinished` is also true an hour after the start. A game won by AI players without rows never has a winner row, so it was never finished and never cached.
+- `groupTeams`: `victory` is true for an AI team that won. The API sends `victory` 0 there.
+- `summarizeGames` skips AI players.
+- `rankTier` and `LATEST_TIER_SEASON`: season 13, with season 12's lines.
+- `UserStat.mmr` is optional: only ranked rows have it.
+
+Added:
+
+- `rpChange(game)`: RP before and after a ranked game. `mmrAfter` is 0 for players who left and paid the penalty.
+- `isBotPlayer(row)` and `GameTeam.bots`.
+- `MatchingMode.RUMBLE_OUT` (13) and the mode name `rumbleOut`.
+- `getTopRanks` takes a `serverCode`. `UserRank.rewardServerCode`.
+- Types for the fields 13.0 added: `experimentResultType`, `questStepClear` and the Research Task credits.
+
+Fixed:
+
+- Notes on `mmrGain`, `mmrAfter`, `rankPoint`, `mmrGainInGame`, `preMade`, `victory` and `playTime`.
+- `since` reads the API's `+0900` offset in every engine.
+- Discord bot example: `/er-watch` could not be turned off after the nickname cache expired, since each lookup gives a new uid.
+- The MCP summary covers normal and ranked games only.
+- Sample data has the shape of season 13 games.
+
+Docs:
 
 - Game data table guide (`DATA.md`, `DATA.ko.md`): what each of the 44 published tables holds and how they link to each other and to game records.
 - The READMEs state that the MIT license covers the code only, not game data or resources.

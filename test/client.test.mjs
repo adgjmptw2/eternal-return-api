@@ -10,6 +10,7 @@ import {
   toPlayerSeason,
   gameModeName,
   RateLimiter,
+  rpChange,
   summarizeGames,
 } from '../dist/index.js'
 
@@ -176,7 +177,70 @@ test('game mode names', () => {
   assert.equal(gameModeName(3), 'rank')
   assert.equal(gameModeName(4), 'cobalt')
   assert.equal(gameModeName(6), 'cobalt')
+  assert.equal(gameModeName(13), 'rumbleOut')
   assert.equal(gameModeName(99), 'unknown')
+})
+
+test('getUserRank is null without a ranked game in the season', async () => {
+  // Live, season 13: rank 0 comes with the RP the player would start from.
+  const rank = (extra) => json({ code: 200, message: 'Success', userRank: { mmr: 3000, nickname: 'n', rank: 0, serverCode: 0, rewardServerCode: 0, serverRank: 0, ...extra } })
+  const { client } = fakeClient({
+    '/v1/rank/uid/new/43/3': rank({}),
+    '/v1/rank/uid/played/43/3': rank({ rank: 90000, mmr: 60, serverCode: 10, rewardServerCode: 10 }),
+    '/v1/rank/uid/none/43/3': json({ code: 200, message: 'Success' }),
+  })
+  assert.equal(await client.getUserRank('new', 43), null)
+  assert.equal((await client.getUserRank('played', 43)).rank, 90000)
+  assert.equal(await client.getUserRank('none', 43), null)
+})
+
+test('getTopRanks takes a server', async () => {
+  const { client, calls } = fakeClient({
+    '/v1/rank/top/43/3': json({ code: 200, message: 'ok', topRanks: [{ rank: 1 }, { rank: 2 }] }),
+    '/v1/rank/top/43/3/10': json({ code: 200, message: 'ok', topRanks: [{ rank: 1 }] }),
+  })
+  assert.equal((await client.getTopRanks(43)).length, 2)
+  assert.equal((await client.getTopRanks(43, 3, 10)).length, 1)
+  // A server without a leaderboard answers 404.
+  assert.deepEqual(await client.getTopRanks(43, 3, 99), [])
+  assert.deepEqual(calls.map((c) => c.key), ['/v1/rank/top/43/3', '/v1/rank/top/43/3/10', '/v1/rank/top/43/3/99'])
+})
+
+test('rpChange reads RP from the field that has it', () => {
+  const ranked = (r) => ({ matchingMode: 3, giveUp: 0, ...r })
+  // The relations are from live rows; the numbers are made up.
+  const cases = [
+    // Plain game.
+    [{ mmrBefore: 4200, mmrGain: 17, mmrGainGambit: 17, mmrAfter: 4217, rankPoint: 4217 }, 4217, 17],
+    // Moved up a tier: 96 - 16 + 50. rankPoint leaves out the 50.
+    [{ mmrBefore: 1380, mmrGain: 130, mmrGainGambit: 130, mmrAfter: 1510, rankPoint: 1460 }, 1510, 130],
+    // Moved down a tier: 7 - 28 - 50.
+    [{ mmrBefore: 2410, mmrGain: -71, mmrGainGambit: -71, mmrAfter: 2339, rankPoint: 2389 }, 2339, -71],
+    // Left and paid twice the entry cost.
+    [{ mmrBefore: 2800, mmrGain: 0, mmrGainGambit: 0, mmrAfter: 0, rankPoint: 2740, giveUp: 1 }, 2740, -60],
+    // Their teammate paid nothing.
+    [{ mmrBefore: 2720, mmrGain: 0, mmrGainGambit: 0, mmrAfter: 2720, rankPoint: 2720 }, 2720, 0],
+    // 12.6: a doubled game. mmrGain has half of it.
+    [{ mmrBefore: 5400, mmrGain: 212, mmrGainGambit: 424, mmrAfter: 5824, rankPoint: 5824 }, 5824, 424],
+    // Gave up with the team at 0 entry cost: the normal fields hold.
+    [{ mmrBefore: 40, mmrGain: 0, mmrGainGambit: 0, mmrAfter: 40, rankPoint: 40, giveUp: 1 }, 40, 0],
+  ]
+  for (const [row, after, change] of cases) {
+    assert.deepEqual(rpChange(ranked(row)), { before: row.mmrBefore, after, change })
+  }
+  assert.equal(rpChange({ matchingMode: 2, mmrGainGambit: 5, rankPoint: 0 }), null)
+  assert.equal(rpChange({ matchingMode: 3 }), null)
+  assert.equal(rpChange(ranked({ mmrBefore: 100 })), null)
+})
+
+test('since reads the +0900 offset', async () => {
+  const g = (id, at) => ({ gameId: id, startDtm: at })
+  const { client } = fakeClient({
+    '/v1/user/games/uid/u': json({ code: 200, message: 'ok', userGames: [g(2, '2026-11-25T09:00:30.030+0900'), g(1, '2026-11-25T08:59:59.059+0900')] }),
+  })
+  const ids = []
+  for await (const game of client.iterateUserGames('u', { since: new Date('2026-11-25T00:00:00Z') })) ids.push(game.gameId)
+  assert.deepEqual(ids, [2])
 })
 
 test('rate limiter spaces requests by the interval', async () => {
@@ -295,4 +359,11 @@ test('summarizeGames counts per character, most played first', () => {
   assert.deepEqual(s.characters.map((c) => [c.characterNum, c.games]), [[2, 3], [1, 1]])
   assert.equal(s.characters[1].averageDamage, null)
   assert.equal(summarizeGames([]).overall.winRate, 0)
+})
+
+test('summarizeGames skips AI players', () => {
+  const g = (extra) => ({ characterNum: 1, gameRank: 2, victory: 0, playerKill: 4, playerAssistant: 0, ...extra })
+  const s = summarizeGames([g({}), g({ isMLBot: true, characterNum: 5, playerKill: 0 }), g({ mlbot: true, playerKill: 0 })])
+  assert.deepEqual([s.overall.games, s.overall.averageKills], [1, 4])
+  assert.deepEqual(s.characters.map((c) => c.characterNum), [1])
 })

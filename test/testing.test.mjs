@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupTeams, rankTier, summarizeGames } from '../dist/index.js'
+import { groupTeams, isGameFinished, rankTier, rpChange, summarizeGames } from '../dist/index.js'
 import { createSampleClient, sampleFetch, SAMPLE_NICKNAME } from '../dist/testing.js'
 
 test('sample client: player, games, teams, names, ranks', async () => {
@@ -17,6 +17,8 @@ test('sample client: player, games, teams, names, ranks', async () => {
   assert.ok(players.length >= 18)
   assert.ok(players.some((p) => p.nickname === SAMPLE_NICKNAME))
   assert.equal(groupTeams(players)[0].gameRank, 1)
+  assert.equal(isGameFinished(players, 0), true)
+  assert.deepEqual([players[0].versionSeason, players[0].versionMajor], [13, 1])
 
   for (const language of ['Korean', 'English']) {
     const names = await er.getNames(language)
@@ -30,6 +32,8 @@ test('sample client: player, games, teams, names, ranks', async () => {
 
   const seasons = await er.getSeasons()
   const seasonId = seasons.currentRankedSeasonId
+  assert.equal(seasonId, 43)
+  assert.equal(seasons.playerSeasonOf(seasonId), 13)
   const top = await er.getTopRanks(seasonId)
   assert.equal(top[0].rank, 1)
   const rank = await er.getUserRank(user.uid, seasonId)
@@ -73,10 +77,20 @@ test('sample games keep the field relations described in GUIDE.md', async () => 
     const rows = await er.getGame(g.gameId)
     const avg = Math.floor(rows.reduce((n, p) => n + p.mmrBefore, 0) / rows.length)
     for (const p of rows) {
-      assert.equal(p.mmrAfter, p.mmrBefore + p.mmrGain)
-      assert.equal(p.mmrGain, p.mmrGainInGame + p.mmrLossEntryCost)
-      assert.equal(p.rankPoint, p.mmrAfter)
+      const base = p.mmrBefore + p.mmrGainInGame + p.mmrLossEntryCost
+      assert.equal(p.rankPoint, base)
+      if (p.giveUp === 1) {
+        assert.deepEqual([p.mmrGain, p.mmrAfter, p.mmrGainInGame], [0, 0, 0])
+        assert.equal(rpChange(p).after, p.rankPoint)
+      } else {
+        const tier = (rp) => rankTier(rp, { season: 13 }).tier
+        assert.equal(p.mmrAfter - base, tier(base) === tier(p.mmrBefore) ? 0 : base > p.mmrBefore ? 50 : -50)
+        assert.equal(p.mmrGain, p.mmrAfter - p.mmrBefore)
+        assert.equal(rpChange(p).after, p.mmrAfter)
+      }
       assert.equal(p.mmrAvg, avg)
+      assert.equal(p.matchSize, rows.length)
+      assert.equal(p.experimentResultType === undefined, p.questStepClear.length === 0)
       assert.ok(Math.abs(ms(p.expireDtm) - ms(p.startDtm) - (90 * 86400 + p.duration) * 1000) <= 5000)
       const [, sec, milli] = /:(\d\d)\.(\d{3})/.exec(p.startDtm)
       assert.equal(Number(milli), Number(sec))

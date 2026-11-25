@@ -10,8 +10,10 @@ import { createInterface } from 'node:readline'
 import { MemoryCache } from './cache.js'
 import { ErClient } from './client.js'
 import { ErApiError, ErNicknameMismatchError } from './errors.js'
+import { isBotPlayer, isGameFinished } from './games.js'
 import { MatchingMode, TeamMode, gameModeName } from './modes.js'
 import type { GameNames } from './names.js'
+import { rpChange } from './rp.js'
 import { summarizeGames, type GameSummary } from './summary.js'
 import { groupTeams } from './teams.js'
 import { rankTier } from './tiers.js'
@@ -29,7 +31,7 @@ const TOOLS = [
   {
     name: 'player_profile',
     description:
-      'Eternal Return player: current squad ranked tier, RP and rank, a summary of recent games (Cobalt Protocol excluded, last 90 days at most), most played characters, and the recent games with character, weapon, tactical skill, traits and items as names.',
+      'Eternal Return player: current squad ranked tier, RP and rank, a summary of recent normal and ranked games (last 90 days at most), most played characters, and the recent games with character, weapon, tactical skill, traits and items as names.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -41,7 +43,8 @@ const TOOLS = [
   },
   {
     name: 'game_detail',
-    description: 'One Eternal Return game by team, best placement first: team kills and every player with character, weapon, kills, assists, damage.',
+    description:
+      'One Eternal Return game by team, best placement first: team kills and every player with character, weapon, kills, assists, damage. `ai` marks AI players. When `finished` is false, teams still playing are missing.',
     inputSchema: {
       type: 'object',
       properties: { gameId: { type: 'integer', description: 'Game ID from player_profile' } },
@@ -102,8 +105,7 @@ function gameJson(game: UserGame, names: GameNames): Json {
     kills: game.playerKill,
     assists: game.playerAssistant,
     damageToPlayer: game.damageToPlayer ?? null,
-    // mmrGain is the RP change in ranked games only.
-    rpGain: game.matchingMode === MatchingMode.RANKED ? game.mmrGain ?? null : null,
+    rpGain: rpChange(game)?.change ?? null,
     tacticalSkill: names.tacticalSkill(game.tacticalSkillGroup),
     traits: traits.filter((code): code is number => typeof code === 'number' && code > 0).map((code) => names.trait(code) ?? code),
     items: equipmentCodes(game).map((code) => names.item(code) ?? code),
@@ -135,13 +137,14 @@ async function playerProfile(er: ErClient, args: Json): Promise<Json> {
     games.push(game)
     if (games.length >= count) break
   }
-  // Cobalt Protocol ranks teams, not players, so it is left out of the averages.
-  const summary = summarizeGames(games.filter((game) => gameModeName(game.matchingMode) !== 'cobalt'))
+  // Other modes have fewer teams, so their ranks would skew the averages.
+  const squad = games.filter((g) => g.matchingMode === MatchingMode.NORMAL || g.matchingMode === MatchingMode.RANKED)
+  const summary = summarizeGames(squad)
   return {
     found: true,
     nickname: user.nickname,
     season,
-    squadRank: rank && rank.mmr > 0 ? { tier: tierText(names, rank.mmr, rank.rank, season), rp: rank.mmr, rank: rank.rank } : null,
+    squadRank: rank ? { tier: tierText(names, rank.mmr, rank.rank, season), rp: rank.mmr, rank: rank.rank } : null,
     recent: summaryJson(summary.overall),
     characters: summary.characters.slice(0, 5).map((c) => ({
       character: names.character(c.characterNum) ?? c.characterNum,
@@ -162,6 +165,7 @@ async function gameDetail(er: ErClient, args: Json): Promise<Json> {
     gameId,
     startDtm: first.startDtm,
     mode: gameModeName(first.matchingMode),
+    finished: isGameFinished(players),
     teams: groupTeams(players).map((team) => ({
       team: team.teamNumber,
       rank: team.gameRank,
@@ -169,6 +173,7 @@ async function gameDetail(er: ErClient, args: Json): Promise<Json> {
       teamKills: team.teamKills,
       players: team.players.map((p) => ({
         nickname: p.nickname ?? null,
+        ...(isBotPlayer(p) ? { ai: true } : {}),
         character: names.character(p.characterNum) ?? p.characterNum,
         weapon: names.weapon(p.bestWeapon),
         kills: p.playerKill,

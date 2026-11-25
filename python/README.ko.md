@@ -8,7 +8,7 @@
 - **끝나지 않은 경기.** 다른 팀이 아직 게임 중일 때 받은 경기에는 1등이 없습니다. `is_game_finished`로 알 수 있고, `get_game`은 이런 경기를 캐시하지 않습니다.
 - **플레이어 감시.** `watch_games`는 플레이어가 경기를 끝내면 알려 줍니다. 디스코드 봇 알림에 쓸 수 있습니다.
 - 요청 속도 제한, 429 재시도, HTTP 200 안의 오류 코드 처리.
-- 팀 묶기(`group_teams`), RP로 티어 계산(`rank_tier`), 공식 번역 파일로 실험체·아이템·특성·무기·전술 스킬 이름 찾기.
+- 팀 묶기(`group_teams`), 경기 전후 RP(`rp_change`), AI 플레이어 구분(`is_bot_player`), RP로 티어 계산(`rank_tier`), 공식 번역 파일로 실험체·아이템·특성·무기·전술 스킬 이름 찾기.
 
 [English](https://github.com/adgjmptw2/eternal-return-api/blob/main/python/README.md) · [실전 가이드](https://github.com/adgjmptw2/eternal-return-api/blob/main/GUIDE.ko.md)
 
@@ -70,7 +70,7 @@ from eternal_return_api import is_game_finished
 
 result = er.sync_user_games(uid, after=saved_newest)  # 몇 판이면 요청 1번
 db.save_games(result.games)
-db.save_newest(uid, result.newest_game_id)
+db.save_newest(player.id, result.newest_game_id)  # uid가 아니라 직접 정한 ID
 
 # 다른 팀이 아직 게임 중일 때 받은 경기에는 1등이 없습니다.
 players = er.get_game(result.games[0]["gameId"])
@@ -82,7 +82,7 @@ if is_game_finished(players):
 - `max_pages`를 주면 `after`에 닿기 전에 멈출 수 있습니다. 이때 `rest`가 오니 `rest`가 더 안 올 때까지 `er.sync_user_games(uid, **result.rest)`를 부르세요. 그 전까지 `newest_game_id`는 예전 `after` 그대로라서, 저장해도 경기를 건너뛰지 않습니다.
 - `after` 없이 부르면 목록 전체(약 90일)를 읽습니다. 처음 받을 때는 `since`나 `max_pages`를 주세요.
 
-ERCraft는 경기 도중에 받은 기록을 완성본으로 저장해서, 팀원 기록이 없다고 나온 적이 있습니다. 실제 API로 확인해 보니, 시작한 지 14분 된 일반 경기는 6행뿐이었고 8분 뒤에는 15행이었는데 여전히 1등이 없었습니다. 끝난 경기에는 `gameRank`가 1인 행이 있습니다. 끝난 경기도 24행보다 적을 수 있어서 행 수로는 알 수 없습니다.
+ERCraft는 경기 도중에 받은 기록을 완성본으로 저장해서, 팀원 기록이 없다고 나온 적이 있습니다. 실제 API로 확인해 보니, 시작한 지 14분 된 일반 경기는 6행뿐이었고 8분 뒤에는 15행이었는데 여전히 1등이 없었습니다. `is_game_finished`는 `gameRank`가 1인 행이 있거나 시작한 지 1시간이 지났으면 끝난 경기로 봅니다. AI 팀이 이긴 경기에는 1등 행이 없을 수 있습니다. 끝난 경기도 24행보다 적을 수 있어서 행 수로는 알 수 없습니다.
 
 ## 플레이어 감시
 
@@ -99,7 +99,7 @@ async def post_results(er: AsyncErClient) -> None:
             print("실패", event.uid, event.error)
 ```
 
-- 첫 바퀴는 플레이어마다 최신 경기만 기억하고, 지난 경기는 알리지 않습니다. 재시작 후 이어서 보려면 마지막으로 처리한 경기를 `after={uid: game_id}`로 넘기세요. `after`는 플레이어가 처음 나타날 때 읽으니, 봇에서 플레이어를 추가하기 전에 값을 넣어 두면 됩니다.
+- 첫 바퀴는 플레이어마다 최신 경기만 기억하고, 지난 경기는 알리지 않습니다. 재시작 후 이어서 보려면 마지막으로 처리한 경기를 `after={uid: game_id}`로 넘기세요. 이때 uid는 `uids`에 넣는 값과 같아야 합니다. `after`는 플레이어가 처음 나타날 때 읽으니, 봇에서 플레이어를 추가하기 전에 값을 넣어 두면 됩니다.
 - 플레이어마다 오래된 경기부터 오고, 지난 바퀴 이후 몇 판을 했든 빠뜨리지 않습니다.
 - 새 경기가 없으면 한 바퀴에 플레이어당 요청 1번이고, 캐시를 쓰지 않습니다. 기본값인 초당 1회면 60명 한 바퀴에 1분이 걸립니다.
 - 한 플레이어의 요청이 실패하면 `ErrorEvent`가 옵니다. 감시는 계속되고 다음 바퀴에 다시 시도합니다.
@@ -117,8 +117,8 @@ async def post_results(er: AsyncErClient) -> None:
 | `sync_user_games(uid, *, after, before, since, max_pages)` | 경기 없음 |
 | `watch_games(uids, *, interval, after, stop)` | 계속 감시 |
 | `get_game(game_id)` | `[]` |
-| `get_user_rank(uid, season_id, team_mode=3)` | `None` |
-| `get_top_ranks(season_id, team_mode=3)` | `[]` |
+| `get_user_rank(uid, season_id, team_mode=3)` | `None`. 그 시즌 랭크를 안 했을 때도 `None` |
+| `get_top_ranks(season_id, team_mode=3, server_code=None)` | `[]` |
 | `get_user_stats(uid, season_id, matching_mode=3)` | `[]` |
 | `get_data(meta_type)` | 예외 |
 | `get_seasons()` | 예외 |
@@ -126,6 +126,8 @@ async def post_results(er: AsyncErClient) -> None:
 | `request(path)` | 예외 |
 
 API 오류와 시간 초과는 `status`, `api_code`가 있는 `ErApiError`로 올라옵니다. 닉네임 조회가 다른 플레이어를 돌려주면 `ErNicknameMismatchError`입니다. httpx의 네트워크 오류는 그대로 올라옵니다.
+
+`uid`는 요청에만 쓰세요. 닉네임을 조회할 때마다 다른 값이 오므로 저장 키로 쓰면 안 됩니다.
 
 ### 옵션
 

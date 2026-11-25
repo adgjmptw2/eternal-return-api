@@ -1,6 +1,7 @@
-import { gameModeName, rankTier, summarizeGames } from 'eternal-return-api'
+import { gameModeName, rankTier, rpChange, summarizeGames } from 'eternal-return-api'
 
-const MODE_LABEL = { normal: '일반', rank: '랭크', cobalt: '코발트', loneWolf: '론울프', unknown: '기타' }
+const MODE_LABEL = { normal: '일반', rank: '랭크', cobalt: '코발트', loneWolf: '론울프', rumbleOut: '럼블 아웃', unknown: '기타' }
+const SQUAD_MODES = ['normal', 'rank']
 
 /** Loads what the /er command shows. Returns null when the player does not exist. */
 export async function loadProfile(er, nickname, { language = 'Korean', pages = 2 } = {}) {
@@ -17,8 +18,8 @@ export async function loadProfile(er, nickname, { language = 'Korean', pages = 2
     season: seasonId ? seasons.playerSeasonOf(seasonId) : null,
     rank,
     games,
-    // Cobalt Protocol ranks teams, not players, so it would skew averages.
-    summary: summarizeGames(games.filter((g) => gameModeName(g.matchingMode) !== 'cobalt')),
+    // Other modes have fewer teams, so their ranks would skew the averages.
+    summary: summarizeGames(games.filter((g) => SQUAD_MODES.includes(gameModeName(g.matchingMode)))),
     names,
   }
 }
@@ -28,7 +29,7 @@ const pct = (x) => `${Math.round(x * 100)}%`
 /** Plain text lines, so the same output works in a Discord embed or a terminal. */
 export function profileText({ user, season, rank, games, summary, names }) {
   const lines = []
-  if (rank && rank.mmr > 0) {
+  if (rank) {
     const tier = rankTier(rank.mmr, { rank: rank.rank, season })
     const localName = names.tier(tier.tier)
     const tierName = !localName ? tier.name : tier.division === null ? localName : `${localName} ${tier.division}`
@@ -40,7 +41,7 @@ export function profileText({ user, season, rank, games, summary, names }) {
 
   const o = summary.overall
   if (o.games > 0) {
-    lines.push('', `최근 ${o.games}경기(코발트 제외): 평균 ${o.averageRank.toFixed(1)}위 · 승률 ${pct(o.winRate)} · TOP3 ${pct(o.top3Rate)} · 평균 ${o.averageKills.toFixed(1)}킬`)
+    lines.push('', `최근 일반·랭크 ${o.games}경기: 평균 ${o.averageRank.toFixed(1)}위 · 승률 ${pct(o.winRate)} · TOP3 ${pct(o.top3Rate)} · 평균 ${o.averageKills.toFixed(1)}킬`)
     lines.push('', '많이 한 실험체')
     for (const c of summary.characters.slice(0, 3)) {
       lines.push(`${names.character(c.characterNum) ?? c.characterNum} ${c.games}판 · 평균 ${c.averageRank.toFixed(1)}위 · ${c.averageKills.toFixed(1)}킬`)
@@ -73,8 +74,7 @@ export function gameText(g, names) {
     `${g.playerKill}킬 ${g.playerAssistant}어시`,
   ]
   if (typeof g.damageToPlayer === 'number') parts.push(`딜량 ${g.damageToPlayer.toLocaleString()}`)
-  if (mode === 'rank' && typeof g.mmrGain === 'number') {
-    parts.push(`RP ${g.mmrGain >= 0 ? '+' : ''}${g.mmrGain} → ${g.mmrAfter?.toLocaleString() ?? '?'}`)
-  }
+  const rp = rpChange(g)
+  if (rp) parts.push(`RP ${rp.change >= 0 ? '+' : ''}${rp.change} → ${rp.after.toLocaleString()}`)
   return parts.join(' · ')
 }
