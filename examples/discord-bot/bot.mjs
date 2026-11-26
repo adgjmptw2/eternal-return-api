@@ -23,7 +23,8 @@ const commands = [
 // nickname -> { uid, nickname, channels: Map(channelId -> newest gameId when turned on) }.
 // Keyed by nickname: every lookup gives a player a different uid. In memory: a restart forgets it.
 const watched = new Map()
-const keyOf = (nickname) => nickname.normalize('NFKC').toLowerCase()
+// The same comparison the client uses to check the nickname a lookup returns.
+const keyOf = (nickname) => nickname.normalize('NFKC').trim().toLowerCase()
 // uid -> newest game when the first channel turned it on, read by watchGames.
 const startAfter = new Map()
 
@@ -79,21 +80,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.commandName === 'er-watch') {
     await interaction.deferReply()
     try {
-      const user = await er.getUserByNickname(nickname)
-      if (!user) {
-        await interaction.editReply(`'${nickname}' 플레이어를 찾지 못했습니다.`)
-        return
-      }
-      const key = keyOf(user.nickname)
-      const turnedOn = await oneAtATime(key, async () => {
+      const key = keyOf(nickname)
+      const result = await oneAtATime(key, async () => {
         const entry = watched.get(key)
+        // Turning off needs no lookup, so it works during maintenance and after a rename.
         if (entry?.channels.delete(interaction.channelId)) {
           if (entry.channels.size === 0) {
             watched.delete(key)
             startAfter.delete(entry.uid)
           }
-          return false
+          return { on: false, name: entry.nickname }
         }
+        const user = await er.getUserByNickname(nickname)
+        if (!user) return null
         // Skip the cache: the start must be the game that is newest right now.
         const { games } = await er.getUserGames(user.uid, undefined, { fresh: true })
         const newest = games[0]?.gameId ?? 0
@@ -102,12 +101,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
           startAfter.set(user.uid, newest)
           watched.set(key, { uid: user.uid, nickname: user.nickname, channels: new Map([[interaction.channelId, newest]]) })
         }
-        return true
+        return { on: true, name: user.nickname }
       })
+      if (!result) {
+        await interaction.editReply(`'${nickname}' 플레이어를 찾지 못했습니다.`)
+        return
+      }
       await interaction.editReply(
-        turnedOn
-          ? `${user.nickname}의 다음 경기부터 이 채널에 결과를 올립니다. 다시 입력하면 알림이 꺼집니다.`
-          : `${user.nickname} 알림을 껐습니다.`,
+        result.on
+          ? `${result.name}의 다음 경기부터 이 채널에 결과를 올립니다. 다시 입력하면 알림이 꺼집니다.`
+          : `${result.name} 알림을 껐습니다.`,
       )
     } catch (e) {
       console.error(e)

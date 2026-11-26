@@ -219,7 +219,7 @@ export class ErClient {
     let loading = this.inFlight.get(key)
     if (!loading) {
       // An unfinished game changes as players finish, so it is never cached.
-      const keep = kind === 'game' ? (body: Envelope) => isGameFinished(arrayField<UserGame>(body, 'userGames'), this.now()) : undefined
+      const keep = kind === 'game' ? (body: Envelope) => isGameFinished(arrayField<UserGame>(body, 'userGames'), { now: this.now() }) : undefined
       loading = this.loadThroughCache(cache, key, path, ttl, keep).finally(() => this.inFlight.delete(key))
       this.inFlight.set(key, loading)
     }

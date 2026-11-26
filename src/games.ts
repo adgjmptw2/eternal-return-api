@@ -15,20 +15,24 @@ export function startTimeOf(game: Pick<UserGame, 'startDtm'>): number {
  * are done, and no winner yet. ERCraft stored such games as final and later
  * showed teammates as missing. Check this before storing a game for good.
  *
- * A game is finished once a row has `gameRank` 1 (Cobalt Protocol too), or an
- * hour after it started. The hour covers beginner games against AI players
- * that have no rows: when one of their teams wins, no row ever has rank 1.
+ * A game is finished once a row has `gameRank` 1 (Cobalt Protocol too). A
+ * game with AI players (`botAdded` above 0) also counts as finished an hour
+ * after it started: when an AI team without rows wins, no row ever has rank 1.
  * The row count is not a test: finished games can have fewer than 24 rows.
  *
- * `now` is for tests. Default: the current time.
+ * Call it on a result you just fetched. The hour is measured to `now`, so
+ * for rows stored earlier, pass the time they were fetched.
  */
-export function isGameFinished(players: Iterable<UserGame>, now: number = Date.now()): boolean {
+export function isGameFinished(players: Iterable<UserGame>, options: { now?: number } = {}): boolean {
   let start = NaN
+  let bots = false
   for (const player of players) {
     if (player.gameRank === 1) return true
     if (Number.isNaN(start)) start = startTimeOf(player)
+    // A missing botAdded is treated as maybe.
+    if (player.botAdded !== 0) bots = true
   }
-  return now - start > GAME_SURELY_OVER_MS
+  return bots && (options.now ?? Date.now()) - start > GAME_SURELY_OVER_MS
 }
 
 /**

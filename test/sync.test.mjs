@@ -143,21 +143,25 @@ test('syncUserGames gives rest whenever maxPages stops it', async () => {
 
 test('isGameFinished looks for the winner, not the row count', () => {
   const start = Date.parse(row(1).startDtm)
-  assert.equal(isGameFinished([], start), false)
-  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 2 })], start), false)
-  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 1 })], start), true)
+  assert.equal(isGameFinished([], { now: start }), false)
+  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 2 })], { now: start }), false)
+  assert.equal(isGameFinished([row(1, { gameRank: 5 }), row(1, { gameRank: 1 })], { now: start }), true)
 })
 
 test('isGameFinished: an hour after the start a game without a winner row is over', () => {
   // Live: a beginner game against AI players without rows. The one player placed 4th and no row has rank 1.
   const players = [row(1, { gameRank: 4, startDtm: '2026-11-20T21:15:08.008+0900', botAdded: 23, matchSize: 1 })]
   const start = Date.UTC(2026, 10, 20, 12, 15, 8, 8)
-  assert.equal(isGameFinished(players, start + 59 * 60_000), false)
-  assert.equal(isGameFinished(players, start + 60 * 60_000), false)
-  assert.equal(isGameFinished(players, start + 60 * 60_000 + 1), true)
+  assert.equal(isGameFinished(players, { now: start + 59 * 60_000 }), false)
+  assert.equal(isGameFinished(players, { now: start + 60 * 60_000 }), false)
+  assert.equal(isGameFinished(players, { now: start + 60 * 60_000 + 1 }), true)
+  // Without AI players the winner row always comes, so the hour does not apply.
+  assert.equal(isGameFinished(players.map((p) => ({ ...p, botAdded: 0 })), { now: start + 1e10 }), false)
+  // Passed to filter, the index is not taken for the time.
+  assert.deepEqual([players].filter(isGameFinished).length, 1)
   // A row without a readable time does not count as old, and the next row decides.
-  assert.equal(isGameFinished([row(1, { gameRank: 4, startDtm: undefined })], start + 1e10), false)
-  assert.equal(isGameFinished([row(1, { gameRank: 4, startDtm: 'x' }), ...players], start + 1e10), true)
+  assert.equal(isGameFinished([row(1, { gameRank: 4, startDtm: undefined })], { now: start + 1e10 }), false)
+  assert.equal(isGameFinished([row(1, { gameRank: 4, startDtm: 'x' }), ...players], { now: start + 1e10 }), true)
 })
 
 test('getGame caches a game without a winner row once it must be over', async () => {

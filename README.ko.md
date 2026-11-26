@@ -64,7 +64,7 @@ const teams = groupTeams(await er.getGame(12345678))
 
 `groupTeams`는 팀을 순위순으로 정렬하고 팀 킬, 어시스트, 딜량을 더해 줍니다. `bots`는 그 팀의 AI 플레이어 수입니다.
 
-`summarizeGames`는 넣은 경기를 AI 플레이어를 빼고 모드 구분 없이 합칩니다. 한 모드만 보려면 `matchingMode`로 먼저 거르세요.
+`summarizeGames`는 넘긴 경기에서 AI 플레이어를 빼고 모든 모드를 합산합니다. 한 모드만 보려면 `matchingMode`로 먼저 거르세요.
 
 `uid`는 요청에만 쓰세요. 닉네임을 조회할 때마다 다른 값이 오므로 저장 키로 쓰면 안 됩니다.
 
@@ -92,7 +92,7 @@ if (isGameFinished(players)) await db.saveGame(players)
 - `maxPages`를 주면 `syncUserGames`가 `after`에 닿기 전에 멈출 수 있습니다. 이때 `rest`가 같이 오니 `rest`가 더 안 올 때까지 그대로 다시 넘기세요. 그 전까지 `newestGameId`는 예전 `after` 그대로라서, 저장해도 경기를 건너뛰지 않습니다.
 - `getGame`은 끝나지 않은 경기를 캐시하지 않습니다.
 
-ERCraft는 경기 도중에 받은 기록을 완성본으로 저장해서, 팀원 기록이 없다고 나온 적이 있습니다. `isGameFinished`는 `gameRank`가 1인 행이 있거나 시작한 지 1시간이 지났으면 끝난 경기로 봅니다. AI 팀이 이긴 경기에는 1등 행이 없을 수 있습니다. 끝난 경기도 24행보다 적을 수 있어서 행 수만으로는 판단할 수 없습니다.
+ERCraft는 경기 도중에 받은 기록을 완성본으로 저장해서, 팀원 기록이 없다고 나온 적이 있습니다. `isGameFinished`는 `gameRank`가 1인 행이 있거나, AI 플레이어가 있는 경기에서 시작한 지 1시간이 지났으면 끝난 경기로 봅니다. AI 팀이 이긴 경기에는 1등 행이 없을 수 있습니다. 받은 직후에 확인하세요. 끝난 경기도 24행보다 적을 수 있어서 행 수만으로는 판단할 수 없습니다.
 
 ### 새 경기 알림
 

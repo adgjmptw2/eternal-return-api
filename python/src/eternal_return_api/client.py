@@ -165,7 +165,7 @@ def _placed(rank: Any) -> dict[str, Any] | None:
     if not isinstance(rank, dict):
         return None
     place = rank.get("rank")
-    return rank if isinstance(place, int) and place > 0 else None
+    return rank if isinstance(place, int) and not isinstance(place, bool) and place > 0 else None
 
 
 def _top_path(season_id: int, team_mode: int, server_code: int | None) -> str:

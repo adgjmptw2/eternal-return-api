@@ -230,6 +230,8 @@ test('rpChange reads RP from the field that has it', () => {
   }
   assert.equal(rpChange({ matchingMode: 2, mmrGainGambit: 5, rankPoint: 0 }), null)
   assert.equal(rpChange({ matchingMode: 3 }), null)
+  assert.equal(rpChange(ranked({ mmrBefore: NaN, mmrAfter: 100 })), null)
+  assert.equal(rpChange(ranked({ mmrBefore: 100, mmrAfter: Infinity })), null)
   assert.equal(rpChange(ranked({ mmrBefore: 100 })), null)
 })
 

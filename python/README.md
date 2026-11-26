@@ -82,7 +82,7 @@ if is_game_finished(players):
 - With `max_pages`, `sync_user_games` may stop before reaching `after`. It then sets `rest`: call `er.sync_user_games(uid, **result.rest)` until no `rest` is returned. Until then `newest_game_id` stays at the old `after`, so saving it never skips games.
 - Without `after`, it reads the whole list (about 90 days). Pass `since` or `max_pages` for a first sync.
 
-ERCraft once stored games fetched mid-game as final, and team records showed teammates as missing. On the live API, a normal game fetched 14 minutes after it started had 6 rows; eight minutes later it had 15 and still no winner. `is_game_finished` looks for a row with `gameRank` 1, or for a start more than an hour ago: a game an AI team won can have no such row. Row count alone is not enough: finished games can have fewer than 24 rows.
+ERCraft once stored games fetched mid-game as final, and team records showed teammates as missing. On the live API, a normal game fetched 14 minutes after it started had 6 rows; eight minutes later it had 15 and still no winner. `is_game_finished` looks for a row with `gameRank` 1, or, in games with AI players, for a start more than an hour ago: a game an AI team won can have no such row. Call it right after fetching. Row count alone is not enough: finished games can have fewer than 24 rows.
 
 ## Watching players
 
@@ -100,7 +100,7 @@ async def post_results(er: AsyncErClient) -> None:
             print("failed", event.uid, event.error)
 ```
 
-- The first round only notes each player's newest game; past games are not reported. To resume after a restart, pass `after={uid: game_id}` with the last game you handled, under the uid you watch with.
+- The first round only notes each player's newest game; past games are not reported. To resume after a restart, pass `after={uid: game_id}` with the last game you handled, under the uid you watch with. `after` is read when a player first appears, so a bot can set an entry before adding a player.
 - Each round costs one request per player when nothing is new, and skips the cache. At the default 1 request per second, 60 players take a minute per round.
 - A failed request for one player comes as an `ErrorEvent`. Watching goes on, and the next round tries again.
 - `uids` may be a function: it is called before every round, so you can add and remove players. A removed player starts fresh when added back.
@@ -115,7 +115,7 @@ async def post_results(er: AsyncErClient) -> None:
 | `get_user_games(uid, next=None)` | empty page |
 | `iter_user_games(uid, *, after, before, since, max_pages)` | ends |
 | `sync_user_games(uid, *, after, before, since, max_pages)` | no games |
-| `watch_games(uids, *, interval, after, max_pages, stop)` | keeps watching |
+| `watch_games(uids, *, interval, after, stop)` | keeps watching |
 | `get_game(game_id)` | `[]` |
 | `get_user_rank(uid, season_id, team_mode=3)` | `None`, also without a ranked game in the season |
 | `get_top_ranks(season_id, team_mode=3, server_code=None)` | `[]` |

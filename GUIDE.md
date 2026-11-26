@@ -69,11 +69,11 @@ The `Season` table and the game use different numbers.
 
 ## AI players
 
-- Games can include AI players. Some have rows like anyone else, with a nickname, a rank and RP: `isMLBot` and `mlbot` are true, and `preMade` is 0. They were in 103 of 403 normal games and 12 of 277 ranked games, up to an average of 2,657 RP, and in no Cobalt Protocol or Rumble Out game. Skip them when you count characters or win rates. `isMLBot` is only in `/v1/games` rows.
+- Games can include AI players. Some have rows like anyone else, with a nickname, a rank and RP: `isMLBot` and `mlbot` are true, and `preMade` is 0. They were in 103 of 403 normal games and 12 of 277 ranked games (games with an `mmrAvg` of 2,657 or less), and in no Cobalt Protocol or Rumble Out game. Skip them when you count characters or win rates. `isMLBot` is only in `/v1/games` rows.
 - Other AI players have no rows. A beginner game can come back with a single row.
 - `botAdded` counts both kinds. `matchSize` is the number of other players.
 - When an AI team wins, `victory` is 0 in every row. If that team has no rows, no row ever has rank 1: 8 of the 1,029 games.
-- So a game is finished once a row has rank 1, or long enough after it started. The longest game took 27 minutes; `isGameFinished` waits an hour.
+- So a game is finished once a row has rank 1, or, when it has AI players (`botAdded` above 0), long enough after it started. The longest game took 27 minutes; `isGameFinished` waits an hour from the start to the time you pass, so check rows when you fetch them.
 
 ## Teams
 
@@ -86,11 +86,11 @@ The `Season` table and the game use different numbers.
 
 Checked on every ranked row of the sample (6,426 rows). In other modes `mmrBefore`, `mmrGain`, `mmrAfter` and `mmrAvg` are missing, and `mmrGainInGame`, `mmrLossEntryCost` and `rankPoint` are 0.
 
-- `mmrAfter` is the RP after the game: `mmrBefore + mmrGainGambit` on every row but the 14 players who left. `mmrGain` is the same number, except in 19 games of 12.5 and 12.6 with `gambit: true`, where the change was doubled and `mmrGain` has the half.
+- `mmrAfter` is the RP after the game: `mmrBefore + mmrGainGambit` on every row but the 14 players who left. `mmrGain` is the same number, except in 19 rows of 12.5 and 12.6 with `gambit: true`, where the change was doubled and `mmrGain` has half of it.
 - The change is `mmrGainInGame + mmrLossEntryCost`, plus or minus 50 when it crosses a tier line. Going up a tier (Silver to Gold, not Gold 4 to Gold 3) adds 50, going down takes 50. Every one of 156 rows that went up and 33 that went down has it, and no other row does.
-- `rankPoint` is `mmrAfter` without that 50.
+- `rankPoint` is the RP after the game without that 50. Players who left have it too, while their `mmrAfter` is 0.
 - A player who left (`giveUp: 1`) and paid the penalty has `mmrGain` and `mmrAfter` 0, and `mmrLossEntryCost` is twice the usual. Their RP is in `rankPoint`, which is `mmrBefore + mmrLossEntryCost`. It equaled the `mmrBefore` of their next ranked game in 11 of 12 cases; the twelfth was 30 lower. Not everyone with `giveUp: 1` pays it.
-- Teammates of such a player can pay nothing: `mmrLossEntryCost` and `mmrGain` are 0, even when `mmrGainInGame` is not. 17 of 28 did.
+- Teammates of such a player can keep their RP: `mmrLossEntryCost` and `mmrGain` are 0 and `mmrAfter` equals `mmrBefore`, even when `mmrGainInGame` is not 0. 17 of 28 did.
 - Teammates often earn different amounts: `mmrGainInGame` differed in 1,595 of 2,055 teams, by 5 in the middle case. The teammate with less RP earned more in 3,411 of 3,712 pairs that differed, and in every one of the 1,051 pairs that placed 1st or 2nd.
 - `mmrLossEntryCost` is the entry cost, set by the division. It is 0 in Iron, then 10 at 600 RP up to 56 at 7,300, and 58 at 7,600 plus 2 for every 250 RP above. A party of two pays a little more. Seasons 12 and 13 have the same costs.
 - `mmrAvg` is the average `mmrBefore` of every row, AI players included, rounded down (all 277 games).
@@ -103,8 +103,8 @@ Checked on every ranked row of the sample (6,426 rows). In other modes `mmrBefor
 The API gives RP and leaderboard rank, not tiers.
 
 - Seasons 12 and 13: Mythril starts at 7,600 RP. Titan and Immortal need 8,300 RP and a leaderboard rank: Immortal is rank 1 to 300, Titan 301 to 1,000.
-- For season 13, entry costs in 13.1 games change at every line from 600 to 7,600, and the 50 for a tier change fits every tier line. The 8,300 line leaves no trace in game records; the 13.0 and 13.1 patch notes do not change it.
-- The patch notes say season rewards for Titan and Immortal go by the player's reward server (`rewardServerCode`). `serverRank` is the rank there.
+- For season 13, entry costs in 13.1 games change at every division line from 600 to 7,600, and the 50 for a tier change comes at every tier line. The 8,300 line leaves no trace in game records; the 13.0 and 13.1 patch notes do not change it.
+- The patch notes say season rewards for Titan and Immortal go by the player's reward server (`rewardServerCode`). `rankTier` uses the cutoffs above, for the leaderboard over all servers, and does not cover that.
 - In seasons 10 and 11, players at or above the Mythril line (7,400 and 7,600 RP) got Titan or Immortal by rank alone.
 - Most tiers below Mythril have divisions 4 to 1. Tables for seasons 1 to 13 are in [`rankTier`](https://adgjmptw2.github.io/eternal-return-api/functions/rankTier.html).
 - Tier names in the localization file use the keys `IRON` … `METEORITE`, `MITHRIL`, `DEMIGOD`, `ETERNITY` and `UNRANK`. The official English names are Mythril, Titan and Immortal.

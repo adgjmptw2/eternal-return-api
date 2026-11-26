@@ -9,11 +9,11 @@ Season 13 (13.0 and 13.1). The field guide's RP and team rules came from 30 game
 Changed results:
 
 - `getUserRank` returns null when the API sends rank 0. Players without a ranked game in the season got the RP they would start from, and the MCP server and the bot example showed it as their tier.
-- `isGameFinished` is also true an hour after the start. A game won by AI players without rows never has a winner row, so it was never finished and never cached.
+- `isGameFinished` is also true an hour after the start of a game with AI players. A game won by AI players without rows never has a winner row, so it was never finished and never cached. The second argument is an options object, `{ now }`.
 - `groupTeams`: `victory` is true for an AI team that won. The API sends `victory` 0 there.
 - `summarizeGames` skips AI players.
 - `rankTier` and `LATEST_TIER_SEASON`: season 13, with season 12's lines.
-- `UserStat.mmr` is optional: only ranked rows have it.
+- `UserStat.mmr` is optional: only ranked rows have it. TypeScript code that reads it needs a check, also for ranked stats.
 
 Added:
 

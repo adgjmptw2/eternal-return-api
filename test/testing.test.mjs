@@ -17,7 +17,7 @@ test('sample client: player, games, teams, names, ranks', async () => {
   assert.ok(players.length >= 18)
   assert.ok(players.some((p) => p.nickname === SAMPLE_NICKNAME))
   assert.equal(groupTeams(players)[0].gameRank, 1)
-  assert.equal(isGameFinished(players, 0), true)
+  assert.equal(isGameFinished(players, { now: 0 }), true)
   assert.deepEqual([players[0].versionSeason, players[0].versionMajor], [13, 1])
 
   for (const language of ['Korean', 'English']) {

@@ -100,6 +100,10 @@ def test_season_13_tier_lines() -> None:
         ({"mmrBefore": 4200, "mmrGain": 17, "mmrAfter": 4217, "rankPoint": 4217}, 4217),
         # Moved up a tier: rankPoint leaves out the 50.
         ({"mmrBefore": 1380, "mmrGain": 130, "mmrAfter": 1510, "rankPoint": 1460}, 1510),
+        # Moved down a tier.
+        ({"mmrBefore": 2410, "mmrGain": -71, "mmrAfter": 2339, "rankPoint": 2389}, 2339),
+        # The teammate of a player who left: no change.
+        ({"mmrBefore": 2720, "mmrGain": 0, "mmrGainInGame": 3, "mmrAfter": 2720, "rankPoint": 2720}, 2720),
         # Left and paid twice the entry cost.
         ({"mmrBefore": 2800, "mmrGain": 0, "mmrAfter": 0, "rankPoint": 2740, "giveUp": 1}, 2740),
         # 12.6: a doubled game.
@@ -118,6 +122,16 @@ def test_rp_change_other_modes() -> None:
     assert rp_change({"matchingMode": 2, "rankPoint": 0, "mmrGainGambit": 5}) is None
     assert rp_change({"matchingMode": 3}) is None
     assert rp_change({"matchingMode": 3, "mmrBefore": 100}) is None
+    assert rp_change({"matchingMode": 3, "mmrBefore": True, "mmrAfter": 5}) is None
+    assert rp_change({"matchingMode": 3, "mmrBefore": 100, "mmrAfter": 100.5}) is None
+
+
+def test_winner_who_gave_up_does_not_change_the_team_result() -> None:
+    rows = [
+        {"teamNumber": 1, "gameRank": 1, "victory": 0, "giveUp": 1, "duration": 1200},
+        {"teamNumber": 1, "gameRank": 1, "victory": 1, "giveUp": 0, "duration": 1300},
+    ]
+    assert group_teams(rows)[0].victory  # type: ignore[arg-type]
 
 
 def test_ai_players() -> None:
@@ -138,6 +152,10 @@ def test_game_without_a_winner_row_is_over_after_an_hour() -> None:
     assert is_game_finished(players, now=start + 3601)  # type: ignore[arg-type]
     assert not is_game_finished([{"gameRank": 4}], now=start * 2)
     assert not is_game_finished([], now=start)
+    # Without AI players the winner row always comes, so the hour does not apply.
+    assert not is_game_finished([{**players[0], "botAdded": 0}], now=start * 2)  # type: ignore[list-item]
+    # A trailing Z reads the same on Python 3.10.
+    assert is_game_finished([{"gameRank": 4, "startDtm": "2026-11-20T12:15:08.008Z"}], now=start + 3601)
 
 
 def test_names_strip_tags_and_unknown_codes() -> None:

@@ -176,15 +176,22 @@ export interface UserGame {
   mmrLossEntryCost?: number
   /** Ranked only. Average `mmrBefore` of every row in the game, AI players included, rounded down. */
   mmrAvg?: number
-  /** Ranked: `mmrAfter` without the 50 for moving a tier. 0 in other modes. */
+  /**
+   * Ranked: RP after the game, without the 50 for moving a tier. Also set for
+   * a player who left, whose `mmrAfter` is 0. 0 in other modes.
+   */
   rankPoint?: number
   /** Not present in responses checked in November 2026. Use `mmrAfter`. */
   rpAfter?: number
   /** Size of the party the player queued with: 1 solo, 2 duo, 3 trio, 4 in Cobalt Protocol. 0 for AI players. */
   preMade?: number
+  /** AI players added to the game, with or without rows. */
   botAdded?: number
   botRemain?: number
-  /** 1 if the player gave up. Their `gameRank`, `teamKill`, `duration` and RP fields can be from when they left. */
+  /**
+   * 1 if the player gave up. Their `gameRank`, `teamKill` and `duration` can be
+   * from when they left. See `mmrAfter` for the penalty.
+   */
   giveUp?: number
   /**
    * Start time in Korea time, e.g. `2026-10-30T15:30:59.059+0900`. The

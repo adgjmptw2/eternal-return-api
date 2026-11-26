@@ -13,12 +13,13 @@ export interface RpChange {
  *
  * `mmrAfter` is right except for a player who left and paid the penalty:
  * `mmrAfter` and `mmrGain` are 0, and `rankPoint` has the RP they were left
- * with. `mmrGain` alone also misses games whose RP change was doubled.
+ * with. Their next game can start a little lower: 1 of 12 checked started 30
+ * lower. `mmrGain` alone also misses games whose RP change was doubled.
  */
 export function rpChange(game: UserGame): RpChange | null {
   const before = game.mmrBefore
-  if (game.matchingMode !== MatchingMode.RANKED || typeof before !== 'number') return null
+  if (game.matchingMode !== MatchingMode.RANKED || !Number.isFinite(before)) return null
   const left = game.giveUp === 1 && game.mmrAfter === 0
   const after = left ? game.rankPoint : game.mmrAfter
-  return typeof after === 'number' ? { before, after, change: after - before } : null
+  return Number.isFinite(after) ? { before: before!, after: after!, change: after! - before! } : null
 }

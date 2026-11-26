@@ -92,7 +92,7 @@ if (isGameFinished(players)) await db.saveGame(players)
 - With `maxPages`, `syncUserGames` may stop before reaching `after`. It then returns `rest`: pass it back until no `rest` is returned. Until then `newestGameId` stays at the old `after`, so saving it never skips games.
 - `getGame` does not cache a game that is not finished.
 
-ERCraft once stored games fetched mid-game as final, and team records showed teammates as missing. `isGameFinished` looks for a row with `gameRank` 1, or for a start more than an hour ago: a game an AI team won can have no such row. Row count alone is not enough: finished games can have fewer than 24 rows.
+ERCraft once stored games fetched mid-game as final, and team records showed teammates as missing. `isGameFinished` looks for a row with `gameRank` 1, or, in games with AI players, for a start more than an hour ago: a game an AI team won can have no such row. Call it right after fetching. Row count alone is not enough: finished games can have fewer than 24 rows.
 
 ### Watching players
 
@@ -124,7 +124,7 @@ for await (const event of er.watchGames({ uids: () => watched, intervalMs: 60_00
 | `watchGames({ uids, intervalMs?, after?, signal? })` | same, every round | keeps watching |
 | `getGame(gameId)` | `/v1/games/{gameId}`, cached only when finished | `[]` |
 | `getUserRank(uid, seasonId, teamMode?)` | `/v1/rank/uid/{uid}/{seasonId}/{teamMode}` | `null` |
-| `getTopRanks(seasonId, teamMode?, serverCode?)` | `/v1/rank/top/{seasonId}/{teamMode}` | `[]` |
+| `getTopRanks(seasonId, teamMode?, serverCode?)` | `/v1/rank/top/{seasonId}/{teamMode}[/{serverCode}]` | `[]` |
 | `getUserStats(uid, seasonId, matchingMode?)` | `/v2/user/stats/uid/{uid}/{seasonId}/{mode}` | `[]` |
 | `getData(metaType)` | `/v2/data/{metaType}` | throws |
 | `getSeasons()` | `/v2/data/Season`, cached | throws |

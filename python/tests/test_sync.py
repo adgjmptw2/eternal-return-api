@@ -92,6 +92,15 @@ def test_since_stops_at_older_games() -> None:
     assert ids(make_client(api).sync_user_games("u", since=since).games) == [10, 9, 8]
 
 
+def test_since_reads_the_offset() -> None:
+    from datetime import datetime, timezone
+
+    games = [{"gameId": 2, "startDtm": "2026-11-25T09:00:30.030+0900"}, {"gameId": 1, "startDtm": "2026-11-25T08:59:59.059+0900"}]
+    api = FakeApi(routes={"/v1/user/games/uid/u": httpx.Response(200, json={"code": 200, "message": "ok", "userGames": games})})
+    since = datetime(2026, 11, 25, tzinfo=timezone.utc)
+    assert ids(make_client(api).iter_user_games("u", since=since)) == [2]
+
+
 def test_is_game_finished_looks_for_the_winner() -> None:
     assert not is_game_finished([])
     assert not is_game_finished([live_row(1, gameRank=5), live_row(1, gameRank=2)])

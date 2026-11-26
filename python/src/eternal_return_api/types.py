@@ -113,14 +113,17 @@ class UserGame(TypedDict, total=False):
     mmrLossEntryCost: int
     #: Ranked only. Average ``mmrBefore`` of every row in the game, AI players included, rounded down.
     mmrAvg: int
-    #: Ranked: ``mmrAfter`` without the 50 for moving a tier. 0 in other modes.
+    #: Ranked: RP after the game, without the 50 for moving a tier. Also set for
+    #: a player who left, whose ``mmrAfter`` is 0. 0 in other modes.
     rankPoint: int
     #: Size of the party the player queued with: 1 solo, 2 duo, 3 trio, 4 in
     #: Cobalt Protocol. 0 for AI players.
     preMade: int
+    #: AI players added to the game, with or without rows.
     botAdded: int
     botRemain: int
-    #: 1 if the player gave up.
+    #: 1 if the player gave up. Their ``gameRank``, ``teamKill`` and ``duration``
+    #: can be from when they left. See ``mmrAfter`` for the penalty.
     giveUp: int
     #: Korea time, e.g. ``2026-10-30T15:30:59.059+0900``. The milliseconds repeat the seconds.
     startDtm: str

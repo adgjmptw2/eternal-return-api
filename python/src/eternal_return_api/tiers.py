@@ -163,8 +163,9 @@ def rank_tier(rp: float, *, rank: int | None = None, season: float | None = None
 
     ``rank`` is the leaderboard rank (``rank`` from ``get_user_rank``).
     ``demigod`` and ``eternity`` need it; without it, the top tier is
-    ``mithril``. Season rewards for these two tiers use the player's reward
-    server, so pass ``serverRank`` to match them. ``season`` is the in-game season number (see
+    ``mithril``. The cutoffs are for the leaderboard over all servers. Season
+    rewards for these two tiers go by the player's reward server, which this
+    does not cover. ``season`` is the in-game season number (see
     ``to_player_season``), default ``LATEST_TIER_SEASON``.
     """
     if not math.isfinite(rp) or rp < 1:

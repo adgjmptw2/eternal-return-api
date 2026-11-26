@@ -8,7 +8,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeGuard
 
 from .modes import MatchingMode
 from .types import UserGame
@@ -24,13 +24,15 @@ def started_at(game: UserGame) -> float | None:
     text = game.get("startDtm")
     if not isinstance(text, str):
         return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
     try:
         return datetime.fromisoformat(_OFFSET.sub(r"\1:\2", text)).timestamp()
     except ValueError:
         return None
 
 
-def is_game_finished(players: Iterable[UserGame], now: float | None = None) -> bool:
+def is_game_finished(players: Iterable[UserGame], *, now: float | None = None) -> bool:
     """Whether a ``get_game`` result is the finished game.
 
     A game fetched while other teams are still playing has only the players
@@ -38,20 +40,26 @@ def is_game_finished(players: Iterable[UserGame], now: float | None = None) -> b
     later showed teammates as missing. Check this before storing a game for
     good.
 
-    A game is finished once a row has ``gameRank`` 1 (Cobalt Protocol too), or
-    an hour after it started. The hour covers beginner games against AI players
-    that have no rows: when one of their teams wins, no row ever has rank 1.
+    A game is finished once a row has ``gameRank`` 1 (Cobalt Protocol too). A
+    game with AI players (``botAdded`` above 0) also counts as finished an hour
+    after it started: when an AI team without rows wins, no row ever has rank 1.
     The row count is not a test: finished games can have fewer than 24 rows.
 
-    ``now`` is a timestamp, for tests. Default: the current time.
+    Call it on a result you just fetched. The hour is measured to ``now`` (a
+    timestamp, default the current time), so for rows stored earlier, pass the
+    time they were fetched.
     """
     start: float | None = None
+    bots = False
     for player in players:
         if player.get("gameRank") == 1:
             return True
         if start is None:
             start = started_at(player)
-    if start is None:
+        # A missing botAdded is treated as maybe.
+        if player.get("botAdded") != 0:
+            bots = True
+    if start is None or not bots:
         return False
     return (time.time() if now is None else now) - start > _GAME_SURELY_OVER
 
@@ -81,14 +89,20 @@ def rp_change(game: UserGame) -> RpChange | None:
 
     ``mmrAfter`` is right except for a player who left and paid the penalty:
     ``mmrAfter`` and ``mmrGain`` are 0, and ``rankPoint`` has the RP they were
-    left with. ``mmrGain`` alone also misses games whose RP change was doubled.
+    left with. Their next game can start a little lower: 1 of 12 checked
+    started 30 lower. ``mmrGain`` alone also misses games whose RP change was
+    doubled.
     """
     before = game.get("mmrBefore")
-    if game.get("matchingMode") != MatchingMode.RANKED or not isinstance(before, int):
+    if game.get("matchingMode") != MatchingMode.RANKED or not _is_int(before):
         return None
     left = game.get("giveUp") == 1 and game.get("mmrAfter") == 0
     after = game.get("rankPoint") if left else game.get("mmrAfter")
-    return RpChange(before, after) if isinstance(after, int) else None
+    return RpChange(before, after) if _is_int(after) else None
+
+
+def _is_int(value: object) -> TypeGuard[int]:
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _num(value: Any) -> float:

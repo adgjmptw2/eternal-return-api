@@ -174,8 +174,9 @@ function leaderboardTier(rp: number, rank: number, ladder: Ladder): TierKey | nu
 export interface RankTierOptions {
   /**
    * Leaderboard rank (`rank` from `getUserRank`). `demigod` and `eternity` need it;
-   * without it, the top tier is `mithril`. Season rewards for these two tiers use
-   * the player's reward server, so pass `serverRank` to match them.
+   * without it, the top tier is `mithril`. The cutoffs are for the leaderboard
+   * over all servers. Season rewards for these two tiers go by the player's
+   * reward server, which this does not cover.
    */
   rank?: number | null
   /** In-game season number (see `toPlayerSeason`). Default `LATEST_TIER_SEASON`. */
