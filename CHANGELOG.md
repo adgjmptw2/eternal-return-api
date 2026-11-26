@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- `UserGame.userCode` is gone: the API sent it for a few hours after 13.2 and no longer does.
+- The same in Python 0.2.1.
+
 ## 0.8.0
 
 Python 0.2.0 has the same changes.
@@ -22,7 +27,6 @@ Added:
 - `MatchingMode.RUMBLE_OUT` (13) and the mode name `rumbleOut`.
 - `getTopRanks` takes a `serverCode`. `UserRank.rewardServerCode`.
 - Types for the fields 13.0 added: `experimentResultType`, `questStepClear` and the Research Task credits. 13.2 ended Research Tasks.
-- `UserGame.userCode` (13.2): an ID that stays the same for a player, unlike the uid.
 
 Fixed:
 

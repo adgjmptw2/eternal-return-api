@@ -244,7 +244,7 @@ Things we ran into in production. The [field guide](GUIDE.md) has more: teams, R
 - **Nickname lookup returns `userId`, not `uid`.** The API returns `userId`, but the docs show `uid`. The client accepts both and always gives you `uid`.
 - **The returned nickname is checked.** The client compares it with the one you asked for, ignoring case and full-width/half-width differences, and throws `ErNicknameMismatchError` if they differ.
 - **Look players up by uid.** Lookup by `userNum` is retired.
-- **The uid is not an ID.** Each nickname lookup returns a different one. Older ones keep working for some time. Use it for requests, not as a key. Since 13.2, game rows have `userCode`, which stays the same.
+- **The uid is not an ID.** Each nickname lookup returns a different one. Older ones keep working for some time. Use it for requests, not as a key.
 - **Rank 0 is not a rank.** Players without a ranked game this season still get RP from the API: the RP they would start from. `getUserRank` returns null for them.
 - **AI players have rows.** Normal games and lower ranked games can include them. `isBotPlayer` tells them apart.
 - **`/v1/user/games` returns only that player's row.** To see all participants, call `/v1/games/{gameId}`.

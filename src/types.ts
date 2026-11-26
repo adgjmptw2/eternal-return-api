@@ -2,7 +2,7 @@ export interface ErUser {
   /**
    * For the player endpoints. Not a stable ID: each nickname lookup returns a
    * different value for the same player, and earlier values keep working for
-   * some time. Do not use it as a key in your own data; see `UserGame.userCode`.
+   * some time. Do not use it as a key in your own data.
    */
   uid: string
   nickname: string
@@ -87,12 +87,6 @@ export interface UserGame {
   versionMinor?: number
   /** The nickname at the time of the game. AI players have one too. */
   nickname?: string
-  /**
-   * From 13.2: an ID that stayed the same for a player across games, nickname
-   * lookups and nickname changes, unlike the uid. The player endpoints do not take it
-   * (HTTP 401). Games from before 13.2 do not have it.
-   */
-  userCode?: string
   /** True for an AI player. See `isBotPlayer`. Only in `getGame` rows. */
   isMLBot?: boolean
   /** Same as `isMLBot`. */

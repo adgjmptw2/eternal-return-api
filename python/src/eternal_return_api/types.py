@@ -15,7 +15,7 @@ from typing import Any, Literal, TypedDict
 class ErUser(TypedDict):
     #: For the player endpoints. Not a stable ID: each nickname lookup returns a
     #: different value for the same player, and earlier values keep working for
-    #: some time. Do not use it as a key in your own data; see ``userCode``.
+    #: some time. Do not use it as a key in your own data.
     uid: str
     nickname: str
 
@@ -49,10 +49,6 @@ class UserGame(TypedDict, total=False):
     versionMinor: int
     #: The nickname at the time of the game. AI players have one too.
     nickname: str
-    #: From 13.2: an ID that stayed the same for a player across games, nickname
-    #: lookups and nickname changes, unlike the uid. The player endpoints do not take it
-    #: (HTTP 401). Games from before 13.2 do not have it.
-    userCode: str
     #: True for an AI player. See ``is_bot_player``. Only in ``get_game`` rows.
     isMLBot: bool
     #: Same as ``isMLBot``.

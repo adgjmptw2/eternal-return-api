@@ -4,7 +4,7 @@ What the Open API actually returns, written while building [ERCraft](https://erc
 
 The client in this package already handles most of this. The guide is for anyone using the API directly, in any language.
 
-Last checked on November 26, 2026. Most of it was measured on 13.1, before the 13.2 patch; what changed in the first hour of 13.2 is noted. "The sample" below is 1,029 finished games in runs of consecutive game ids, all ranks and servers: 650 games of 13.0 and 13.1 (season 13) and 379 of 12.5 to 12.7, 18,495 rows in all.
+Last checked on November 26, 2026. Most of it was measured on 13.1, before the 13.2 patch; what changed in 13.2 is noted. "The sample" below is 1,029 finished games in runs of consecutive game ids, all ranks and servers: 650 games of 13.0 and 13.1 (season 13) and 379 of 12.5 to 12.7, 18,495 rows in all.
 
 [한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/GUIDE.ko.md)
 
@@ -20,7 +20,6 @@ Last checked on November 26, 2026. Most of it was measured on 13.1, before the 1
 
 - Nickname lookup returns `userId`. The docs call it `uid`. Player endpoints take this value.
 - `userId` is not a stable ID. Two lookups of one nickname, seconds apart, returned different values, and both gave the same games. Use it for requests, not as a key: anything keyed by it gets a new player on every lookup. How long a value lasts is not documented; ERCraft has seen older ones keep working.
-- Since 13.2, game rows have `userCode`: a 32-character ID that stays with the player. In the first three hours of 13.2 (1,438 games), no nickname had two codes, 40 of 40 players had the same code through lookups that gave different uids, and the 2 players who changed nickname kept their code. It is not in the nickname lookup, the player endpoints answer 401 to it, and games from before 13.2 do not have it. To key stored data, use it where you have it.
 - Rows in `/v1/user/games` carry the nickname from the time of the game, so they do not tell who has a nickname now.
 - During the game's maintenance, nickname lookup answers 404 for every nickname, while player games and top ranks keep working. Seen on November 12, 2026.
 - Lookup by `userNum` is retired.
