@@ -1,6 +1,6 @@
 # 이터널 리턴 Open API 게임 데이터 표
 
-`/v2/data/{이름}`으로 받는 표마다 무엇이 들어 있는지, 표끼리 어떻게 이어지는지, 경기 기록과 어떻게 이어지는지 정리했습니다. 2026년 11월 26일(13.1, 13.2 패치 전)에 표 전체로 확인했습니다.
+`/v2/data/{이름}`으로 받는 표마다 무엇이 들어 있는지, 표끼리 어떻게 이어지는지, 경기 기록과 어떻게 이어지는지 정리했습니다. 2026년 11월 26일(13.2)에 표 전체로 확인했습니다.
 
 [English](https://github.com/adgjmptw2/eternal-return-api/blob/main/DATA.md) · [실전 가이드](GUIDE.ko.md)
 
@@ -21,7 +21,7 @@
 | `tacticalSkillGroup` | `TacticalSkillSetGroup.group` | 11,754행 모두 |
 | `seasonId` | `Season.seasonID` | 랭크 경기 |
 
-개수는 13.0과 13.1의 모든 모드 650판을 13.1 표와 대조해 센 것입니다.
+개수는 13.0과 13.1의 모든 모드 650판을 13.1 표와 13.2 표에 대조해 센 것입니다.
 
 ## 표 안의 모드 번호
 
@@ -32,13 +32,13 @@
 | 표 | 행 | 내용 | 연결 |
 |---|---|---|---|
 | `Character` | 92 | 실험체 기본 능력치: `maxHp`, `attackPower`, `defense`, `attackSpeed`, `moveSpeed`, `hpRegen`. 역할(`charArcheType1`, `charArcheType2`)과 근거리·원거리(`weaponRangeType`)도 있음. | 이름: `Character/Name/{code}` |
-| `CharacterLevelUpStat` | 91 | 레벨당 오르는 능력치. 코드와 필드가 `Character`와 같음. | `code` = `Character.code` |
+| `CharacterLevelUpStat` | 92 | 레벨당 오르는 능력치. 코드와 필드가 `Character`와 같음. | `code` = `Character.code` |
 | `CharacterExp` | 20 | 게임 안 레벨 1~20에 필요한 경험치. 20레벨은 0. | |
-| `CharacterMastery` | 91 | 실험체가 쓸 수 있는 무기 종류(`weapon1`~`weapon4`, 없으면 `None`). 패키지의 `getGameData()`가 이 표를 읽음. | `code` = `Character.code`, 무기 = `WeaponTypeInfo.type` |
-| `CharacterAttributes` | 119 | 실험체·무기별 1~5 평가: `controlDifficulty`, `attack`, `defense`, `disruptor`, `move`, `assistance`. | `characterCode` = `Character.code`, `mastery` = `WeaponTypeInfo.type` |
-| `CharacterModeModifier` | 211 | 실험체·무기별, 모드별 보정 퍼센트: 주는 피해·받는 피해, 회복, 보호막, 궁극기 쿨다운. 앞에 `solo`, `duo`, `squad`, `cobalt`가 붙고 13.0부터 `rumbleOut`도 있음. `squad` 값은 모두 100(추가 피해 항목은 0). | `characterCode` = `Character.code` |
+| `CharacterMastery` | 92 | 실험체가 쓸 수 있는 무기 종류(`weapon1`~`weapon4`, 없으면 `None`). 패키지의 `getGameData()`가 이 표를 읽음. | `code` = `Character.code`, 무기 = `WeaponTypeInfo.type` |
+| `CharacterAttributes` | 120 | 실험체·무기별 1~5 평가: `controlDifficulty`, `attack`, `defense`, `disruptor`, `move`, `assistance`. | `characterCode` = `Character.code`, `mastery` = `WeaponTypeInfo.type` |
+| `CharacterModeModifier` | 213 | 실험체·무기별, 모드별 보정 퍼센트: 주는 피해·받는 피해, 회복, 보호막, 궁극기 쿨다운. 앞에 `solo`, `duo`, `squad`, `cobalt`가 붙고 13.0부터 `rumbleOut`도 있음. `squad` 값은 모두 100(추가 피해 항목은 0). | `characterCode` = `Character.code` |
 | `CharacterSkin` | 432 | 스킨: `characterCode`, `grade`, `purchaseType`, 리소스 경로. 실험체마다 `index` 0인 스킨이 하나씩 있고, 이름이 실험체 이름과 같음. | `characterCode` = `Character.code`, 이름: `Skin/Name/{code}` |
-| `RecommendedList` | 119 | 실험체·무기별 코발트 프로토콜 설정: 추천 전술 스킬(`cobaltRecommendTacticalSkill`), 무기 선택 가능 여부. | `cobaltRecommendTacticalSkill` = `TacticalSkillSetGroup.group`(12개 중 12) |
+| `RecommendedList` | 120 | 실험체·무기별 코발트 프로토콜 설정: 추천 전술 스킬(`cobaltRecommendTacticalSkill`), 무기 선택 가능 여부. | `cobaltRecommendTacticalSkill` = `TacticalSkillSetGroup.group`(12개 중 12) |
 
 ## 무기·생존 숙련도
 
@@ -47,7 +47,7 @@
 | `WeaponTypeInfo` | 23 | 무기 종류별 기본 `attackSpeed`, `attackRange`. | 이름: `WeaponType/{type}` |
 | `MasteryLevel` | 560 | 숙련도 레벨(1~20)별 경험치. 무기 23종과 `Craft`, `Defense`, `Hunt`, `Move`, `Search`까지 28종. | 이름: `MasteryType/{type}` |
 | `MasteryExp` | 83 | 행동별 숙련도 경험치. 예: `CraftWeapon`, `AttackDamageToPlayer`. 아이템 등급별로 다름. | |
-| `MasteryStat` | 124 | 실험체·숙련도 종류별로 오르는 능력치. 각각 네 구간. | `characterCode` = `Character.code`. 모든 실험체 공통 숙련도는 0 |
+| `MasteryStat` | 125 | 실험체·숙련도 종류별로 오르는 능력치. 각각 네 구간. | `characterCode` = `Character.code`. 모든 실험체 공통 숙련도는 0 |
 
 ## 아이템
 
@@ -97,7 +97,7 @@
 | 표 | 행 | 내용 | 연결 |
 |---|---|---|---|
 | `Trait` | 148 | 특성: `traitGroup`(`Havoc`, `Fortification`, `Support`, `Chaos`, `Cobalt`), `traitType`(`Core`, `Sub1`, `Sub2`, `Cobalt`). 92행이 코발트 프로토콜용. | 이름: `Trait/Name/{code}` |
-| `TacticalSkillSetGroup` | 43 | 전술 스킬 묶음. `group`이 경기 기록의 `tacticalSkillGroup`. | `startCode` = `TacticalSkillSet.code`(43개 중 43) |
+| `TacticalSkillSetGroup` | 41 | 전술 스킬 묶음. `group`이 경기 기록의 `tacticalSkillGroup`. | `startCode` = `TacticalSkillSet.code`(41개 중 41) |
 | `TacticalSkillSet` | 78 | 강화 단계별 행: `nextUpgradeCode`, `upgradeCredit`, `skillCode`. | 이름: 실전 가이드의 전술 스킬 찾기 참고 |
 | `InfusionProduct` | 110 | 코발트 프로토콜 인퓨전: 종류(`Trait`, `TacticalSkill`, `Item` 등), 가격, 재고. | `productType`에 따라 `productCode` = `Trait.code`(81개 중 81), 전술 스킬 코드(21개 중 21), 아이템 코드(5개 중 5) |
 
@@ -116,7 +116,7 @@
 | 표 | 행 | 내용 | 연결 |
 |---|---|---|---|
 | `GameTip` | 92 | 루미아 섬과 코발트 프로토콜 게임 팁. | `titleTextKey`, `contentTextKey`가 번역 키(92개 중 92) |
-| `LoadingTip` | 598 | 로딩 화면 팁. | `textKey`가 번역 키(598개 중 598) |
+| `LoadingTip` | 601 | 로딩 화면 팁. | `textKey`가 번역 키(601개 중 601) |
 | `Season` | 44 | 시즌과 시작·종료 시각. 번호 읽는 법은 실전 가이드에 있음. | `seasonID` = 경기 기록의 `seasonId` |
 
 ## 참고

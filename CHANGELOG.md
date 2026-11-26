@@ -4,7 +4,7 @@
 
 Python 0.2.0 has the same changes.
 
-Season 13 (13.0 and 13.1). The field guide's RP and team rules came from 30 games, most of them by top players. They were checked again on 1,029 games of all ranks, and several were wrong or incomplete.
+Season 13 (13.0 to 13.2). The field guide's RP and team rules came from 30 games, most of them by top players. They were checked again on 1,029 games of all ranks, and several were wrong or incomplete.
 
 Changed results:
 
@@ -21,7 +21,8 @@ Added:
 - `isBotPlayer(row)` and `GameTeam.bots`.
 - `MatchingMode.RUMBLE_OUT` (13) and the mode name `rumbleOut`.
 - `getTopRanks` takes a `serverCode`. `UserRank.rewardServerCode`.
-- Types for the fields 13.0 added: `experimentResultType`, `questStepClear` and the Research Task credits.
+- Types for the fields 13.0 added: `experimentResultType`, `questStepClear` and the Research Task credits. 13.2 ended Research Tasks.
+- `UserGame.userCode` (13.2): an ID that stays the same for a player, unlike the uid.
 
 Fixed:
 

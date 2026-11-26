@@ -15,7 +15,7 @@ from typing import Any, Literal, TypedDict
 class ErUser(TypedDict):
     #: For the player endpoints. Not a stable ID: each nickname lookup returns a
     #: different value for the same player, and earlier values keep working for
-    #: some time. Do not use it as a key in your own data.
+    #: some time. Do not use it as a key in your own data; see ``userCode``.
     uid: str
     nickname: str
 
@@ -49,6 +49,10 @@ class UserGame(TypedDict, total=False):
     versionMinor: int
     #: The nickname at the time of the game. AI players have one too.
     nickname: str
+    #: From 13.2: an ID that stayed the same for a player across games and
+    #: nickname lookups, unlike the uid. The player endpoints do not take it
+    #: (HTTP 401). Games from before 13.2 do not have it.
+    userCode: str
     #: True for an AI player. See ``is_bot_player``. Only in ``get_game`` rows.
     isMLBot: bool
     #: Same as ``isMLBot``.
@@ -136,7 +140,8 @@ class UserGame(TypedDict, total=False):
     duration: int
     finalInfusion: list[int]
     #: 13.0 and 13.1, normal and ranked: the team's Research Task field. Missing
-    #: when the team cleared none. The 13.2 patch notes end Research Tasks.
+    #: when the team cleared none. 13.2 ended Research Tasks: the field is gone
+    #: and the other Research Task fields are 0 or empty.
     experimentResultType: Literal["Material", "Energy", "Biotechnology"]
     #: 13.0 and 13.1: cleared Research Tasks, in the order they were first cleared.
     questStepClear: list[QuestStepClear]

@@ -4,7 +4,7 @@ What the Open API actually returns, written while building [ERCraft](https://erc
 
 The client in this package already handles most of this. The guide is for anyone using the API directly, in any language.
 
-Last checked on November 26, 2026, before the 13.2 patch. "The sample" below is 1,029 finished games in runs of consecutive game ids, all ranks and servers: 650 games of 13.0 and 13.1 (season 13) and 379 of 12.5 to 12.7, 18,495 rows in all.
+Last checked on November 26, 2026. Most of it was measured on 13.1, before the 13.2 patch; what changed in the first hour of 13.2 is noted. "The sample" below is 1,029 finished games in runs of consecutive game ids, all ranks and servers: 650 games of 13.0 and 13.1 (season 13) and 379 of 12.5 to 12.7, 18,495 rows in all.
 
 [한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/GUIDE.ko.md)
 
@@ -20,6 +20,7 @@ Last checked on November 26, 2026, before the 13.2 patch. "The sample" below is 
 
 - Nickname lookup returns `userId`. The docs call it `uid`. Player endpoints take this value.
 - `userId` is not a stable ID. Two lookups of one nickname, seconds apart, returned different values, and both gave the same games. Use it for requests, not as a key: anything keyed by it gets a new player on every lookup. How long a value lasts is not documented; ERCraft has seen older ones keep working.
+- Since 13.2, game rows have `userCode`: a 32-character ID that was the same for a player across games and across lookups that gave different uids (15 of 15 players, first hour of 13.2). It is not in the nickname lookup, the player endpoints answer 401 to it, and games from before 13.2 do not have it. To key stored data, use it where you have it.
 - Rows in `/v1/user/games` carry the nickname from the time of the game, so they do not tell who has a nickname now.
 - During the game's maintenance, nickname lookup answers 404 for every nickname, while player games and top ranks keep working. Seen on November 12, 2026.
 - Lookup by `userNum` is retired.
@@ -111,7 +112,7 @@ The API gives RP and leaderboard rank, not tiers.
 
 ## Research Tasks (13.0 and 13.1)
 
-Normal and ranked games of 13.0 and 13.1 have Research Tasks, and the 13.2 patch notes (November 26, 2026) end them.
+Normal and ranked games of 13.0 and 13.1 have Research Tasks. 13.2 (November 26, 2026) ended them: `experimentResultType` is gone, `questStepClear` is empty, and the credits are 0.
 
 - `experimentResultType` is the team's field: `Material`, `Energy` or `Biotechnology`. It is missing when the team cleared nothing, and in other modes.
 - `questStepClear` lists cleared tasks in the order they were first cleared: `experimentGroupId`, `firstClearElapsedSeconds` and `clearCount`. It is an empty list when there are none.
@@ -133,4 +134,5 @@ Normal and ranked games of 13.0 and 13.1 have Research Tasks, and the 13.2 patch
 - **`tacticalSkillGroup`**: find the `TacticalSkillSetGroup` row, take its `startCode`, find that `TacticalSkillSet` row and take `skillCode`. `skillCode` can be a string like `"4524001, 4524011"`; use the first number. Round it down to a multiple of 1,000 and look up `Skill/Group/Name/{code}`. If that key is missing, ERCraft tries the number at the end of the group's icon name.
 - **`equipment`** is an object keyed by slot: `"0"` weapon, `"1"` chest, `"2"` head, `"3"` arm, `"4"` leg. Some rows lack a slot. Checked against the `ItemWeapon` and `ItemArmor` tables. Slot names are under `ArmorType/{Chest|Head|Arm|Leg}`.
 - **`equipmentGrade`** uses the same keys: 1 Common, 2 Uncommon, 3 Rare, 4 Epic, 5 Legendary, 6 Mythic. All 58,728 items of the 13.0 and 13.1 games match their table grade. In data tables, `itemGrade` is a string like `Legend`; look it up with `ItemGrade/{itemGrade}`.
+- Names come from the current tables. A patch can remove codes that older games still have: 13.2 removed two Cobalt Protocol tactical skill groups (41 left of 43).
 - The localization file keeps names of removed content. A name existing there does not mean the item is still in the game; check the current data table.

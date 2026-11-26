@@ -1,6 +1,6 @@
 # Eternal Return Open API: game data tables
 
-What each table under `/v2/data/{name}` holds, how the tables connect, and how they connect to game records. Checked on November 26, 2026 (13.1, before 13.2) against the full tables.
+What each table under `/v2/data/{name}` holds, how the tables connect, and how they connect to game records. Checked on November 26, 2026 (13.2) against the full tables.
 
 [한국어](https://github.com/adgjmptw2/eternal-return-api/blob/main/DATA.ko.md) · [Field guide](GUIDE.md)
 
@@ -21,7 +21,7 @@ What each table under `/v2/data/{name}` holds, how the tables connect, and how t
 | `tacticalSkillGroup` | `TacticalSkillSetGroup.group` | 11,754 of 11,754 |
 | `seasonId` | `Season.seasonID` | ranked games |
 
-Counts are from 650 games of 13.0 and 13.1 in every mode, checked against the 13.1 tables.
+Counts are from 650 games of 13.0 and 13.1 in every mode, checked against the 13.1 and 13.2 tables.
 
 ## Mode numbers in the tables
 
@@ -32,13 +32,13 @@ Counts are from 650 games of 13.0 and 13.1 in every mode, checked against the 13
 | Table | Rows | What it holds | Links |
 |---|---|---|---|
 | `Character` | 92 | Base stats per character: `maxHp`, `attackPower`, `defense`, `attackSpeed`, `moveSpeed`, `hpRegen`, plus archetypes (`charArcheType1`, `charArcheType2`) and melee or ranged (`weaponRangeType`). | name: `Character/Name/{code}` |
-| `CharacterLevelUpStat` | 91 | Stat gains per level (same codes and fields as `Character`). | `code` = `Character.code` |
+| `CharacterLevelUpStat` | 92 | Stat gains per level (same codes and fields as `Character`). | `code` = `Character.code` |
 | `CharacterExp` | 20 | Experience needed for each in-game level, 1 to 20. Level 20 needs 0. | |
-| `CharacterMastery` | 91 | Which weapon types each character can use (`weapon1` to `weapon4`, `None` when unused). The package's `getGameData()` reads it. | `code` = `Character.code`; weapons = `WeaponTypeInfo.type` |
-| `CharacterAttributes` | 119 | One row per character and weapon: 1 to 5 ratings for `controlDifficulty`, `attack`, `defense`, `disruptor`, `move`, `assistance`. | `characterCode` = `Character.code`; `mastery` = `WeaponTypeInfo.type` |
-| `CharacterModeModifier` | 211 | Per character and weapon, percentage adjustments by mode: damage dealt and taken, healing, shields, ultimate cooldown. Prefixes `solo`, `duo`, `squad`, `cobalt`, and `rumbleOut` since 13.0. All `squad` values are 100 (or 0 for bonuses). | `characterCode` = `Character.code` |
+| `CharacterMastery` | 92 | Which weapon types each character can use (`weapon1` to `weapon4`, `None` when unused). The package's `getGameData()` reads it. | `code` = `Character.code`; weapons = `WeaponTypeInfo.type` |
+| `CharacterAttributes` | 120 | One row per character and weapon: 1 to 5 ratings for `controlDifficulty`, `attack`, `defense`, `disruptor`, `move`, `assistance`. | `characterCode` = `Character.code`; `mastery` = `WeaponTypeInfo.type` |
+| `CharacterModeModifier` | 213 | Per character and weapon, percentage adjustments by mode: damage dealt and taken, healing, shields, ultimate cooldown. Prefixes `solo`, `duo`, `squad`, `cobalt`, and `rumbleOut` since 13.0. All `squad` values are 100 (or 0 for bonuses). | `characterCode` = `Character.code` |
 | `CharacterSkin` | 432 | Skins: `characterCode`, `grade`, `purchaseType` and resource paths. Each character has one skin with `index` 0, named after the character. | `characterCode` = `Character.code`; name: `Skin/Name/{code}` |
-| `RecommendedList` | 119 | Per character and weapon, Cobalt Protocol settings: `cobaltRecommendTacticalSkill` and whether the weapon can be chosen. | `cobaltRecommendTacticalSkill` = `TacticalSkillSetGroup.group` (12 of 12) |
+| `RecommendedList` | 120 | Per character and weapon, Cobalt Protocol settings: `cobaltRecommendTacticalSkill` and whether the weapon can be chosen. | `cobaltRecommendTacticalSkill` = `TacticalSkillSetGroup.group` (12 of 12) |
 
 ## Weapon and survival mastery
 
@@ -47,7 +47,7 @@ Counts are from 650 games of 13.0 and 13.1 in every mode, checked against the 13
 | `WeaponTypeInfo` | 23 | Base `attackSpeed` and `attackRange` per weapon type. | name: `WeaponType/{type}` |
 | `MasteryLevel` | 560 | Experience per mastery level (1 to 20) for 28 types: the 23 weapon types plus `Craft`, `Defense`, `Hunt`, `Move`, `Search`. | name: `MasteryType/{type}` |
 | `MasteryExp` | 83 | Mastery experience gained per action, e.g. `CraftWeapon` or `AttackDamageToPlayer`, by item grade. | |
-| `MasteryStat` | 124 | Stats a mastery gives per character and type, in four sections each. | `characterCode` = `Character.code`; 0 for masteries every character shares |
+| `MasteryStat` | 125 | Stats a mastery gives per character and type, in four sections each. | `characterCode` = `Character.code`; 0 for masteries every character shares |
 
 ## Items
 
@@ -97,7 +97,7 @@ Look up area names by `name`, not `code`: `Area/Name/Harbor` is the Harbor, whil
 | Table | Rows | What it holds | Links |
 |---|---|---|---|
 | `Trait` | 148 | Augments: `traitGroup` (`Havoc`, `Fortification`, `Support`, `Chaos`, `Cobalt`), `traitType` (`Core`, `Sub1`, `Sub2`, `Cobalt`). 92 rows are Cobalt Protocol. | name: `Trait/Name/{code}` |
-| `TacticalSkillSetGroup` | 43 | Tactical skill groups. `group` is the game record's `tacticalSkillGroup`. | `startCode` = `TacticalSkillSet.code` (43 of 43) |
+| `TacticalSkillSetGroup` | 41 | Tactical skill groups. `group` is the game record's `tacticalSkillGroup`. | `startCode` = `TacticalSkillSet.code` (41 of 41) |
 | `TacticalSkillSet` | 78 | Each upgrade step: `nextUpgradeCode`, `upgradeCredit`, `skillCode`. | name: see the field guide's tactical skill lookup |
 | `InfusionProduct` | 110 | Cobalt Protocol infusions: type (`Trait`, `TacticalSkill`, `Item` and others), price, stock. | `productCode` = `Trait.code` (81 of 81), tactical skill codes (21 of 21) or item codes (5 of 5) by `productType` |
 
@@ -116,7 +116,7 @@ Look up area names by `name`, not `code`: `Area/Name/Harbor` is the Harbor, whil
 | Table | Rows | What it holds | Links |
 |---|---|---|---|
 | `GameTip` | 92 | In-game tips for Lumia Island and Cobalt Protocol. | `titleTextKey`, `contentTextKey` are localization keys (92 of 92) |
-| `LoadingTip` | 598 | Loading screen tips. | `textKey` is a localization key (598 of 598) |
+| `LoadingTip` | 601 | Loading screen tips. | `textKey` is a localization key (601 of 601) |
 | `Season` | 44 | Seasons with start and end times. The field guide explains the numbering. | `seasonID` = game record `seasonId` |
 
 ## Notes
