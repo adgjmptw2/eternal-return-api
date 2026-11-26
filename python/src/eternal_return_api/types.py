@@ -49,8 +49,8 @@ class UserGame(TypedDict, total=False):
     versionMinor: int
     #: The nickname at the time of the game. AI players have one too.
     nickname: str
-    #: From 13.2: an ID that stayed the same for a player across games and
-    #: nickname lookups, unlike the uid. The player endpoints do not take it
+    #: From 13.2: an ID that stayed the same for a player across games, nickname
+    #: lookups and nickname changes, unlike the uid. The player endpoints do not take it
     #: (HTTP 401). Games from before 13.2 do not have it.
     userCode: str
     #: True for an AI player. See ``is_bot_player``. Only in ``get_game`` rows.
